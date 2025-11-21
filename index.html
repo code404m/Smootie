@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smootie Island</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="notch">
+        <span id="clock">--:--:--</span>
+    </div>
+
+    <script>
+        // Initial time
+        document.getElementById("clock").innerText = window.SmootieAPI.getTime();
+
+        // Update every second
+        window.SmootieAPI.onTick((time) => {
+            document.getElementById("clock").innerText = time;
+        });
+    </script>
+</body>
+</html>

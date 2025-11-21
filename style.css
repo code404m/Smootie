@@ -1,0 +1,49 @@
+/* MacBook Pro 2021 style notch */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* Notch container */
+#notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: 360px;
+  height: 40px;
+
+  background: #000000; /* pure black, no transparency */
+  
+  /* Flat top, rounded bottom */
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* No shadows, no blur */
+  box-shadow: none !important;
+  filter: none !important;
+
+  /* draggable top area */
+  -webkit-app-region: drag;
+}
+
+/* Clock text */
+#clock {
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
