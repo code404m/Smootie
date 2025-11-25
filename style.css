@@ -1,49 +1,288 @@
-/* MacBook Pro 2021 style notch */
+/* Modern island styling */
+
+:root {
+  --bg: #04070d;
+  --panel: #0b101c;
+  --glow: #0ac7c7;
+  --text: #f0f4f9;
+  --muted: #91a2b8;
+  --accent: #1fb5d5;
+  --badge: #f24e60;
+  --card-radius: 24px;
+  --small-radius: 12px;
+  --shadow: 0 22px 36px rgba(0, 0, 0, 0.6);
+}
 
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: transparent !important;
+  background: transparent;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  font-family: "SF Pro Display", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+}
+
+#notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 720px;
+  height: 138px;
+  padding: 18px 20px 16px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.65fr;
+  gap: 16px;
+  align-items: center;
+  background: linear-gradient(140deg, #060a12 0%, #050810 55%, #0b1224 100%);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  -webkit-app-region: drag;
   overflow: hidden;
 }
 
-/* Notch container */
-#notch {
+#notch::before {
+  content: "";
   position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-
-  width: 360px;
-  height: 40px;
-
-  background: #000000; /* pure black, no transparency */
-  
-  /* Flat top, rounded bottom */
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* No shadows, no blur */
-  box-shadow: none !important;
-  filter: none !important;
-
-  /* draggable top area */
-  -webkit-app-region: drag;
+  inset: 1px;
+  border-radius: calc(var(--card-radius) - 2px);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  pointer-events: none;
 }
 
-/* Clock text */
-#clock {
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+#notch::after {
+  content: "";
+  position: absolute;
+  inset: -26px;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(20, 210, 205, 0.18), transparent 26%),
+    radial-gradient(circle at 80% 18%, rgba(31, 171, 255, 0.16), transparent 25%),
+    radial-gradient(circle at 50% 86%, rgba(18, 177, 158, 0.12), transparent 30%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pane {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+
+.top-nav {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.nav-label.active {
+  color: var(--text);
+}
+
+.nav-dot {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.left-pane .album-stack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.album-art {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.album-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.music-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 26px;
+  height: 26px;
+  background: #ec4655;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  color: #fff;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.track-details {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: #f9fbff;
+}
+
+.track-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.track-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.6px;
+}
+
+.track-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.control-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f7fb;
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.track-artist {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.center-pane {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+}
+
+.month-label {
   font-size: 22px;
-  font-weight: 500;
-  user-select: none;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: lowercase;
+  align-self: flex-start;
+}
+
+.day-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.day {
+  min-width: 42px;
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.day.muted {
+  color: #71829b;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.day.active {
+  min-width: 72px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #2ed2e8 0%, #0ea6df 100%);
+  color: #e5f7ff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.32);
+}
+
+.day .dow {
+  font-size: 10px;
+  letter-spacing: 1px;
+  opacity: 0.82;
+}
+
+.day .date {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.empty-state {
+  font-size: 14px;
+  color: #7c8aa5;
+  margin-top: 2px;
+}
+
+.right-pane {
+  justify-content: flex-end;
+}
+
+.avatar-ring {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  padding: 4px;
+  background: conic-gradient(from 160deg, #20d2cb, #19a6f2, #0f8fdc, #20d2cb);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.46);
+}
+
+.avatar-ring img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+  border: 3px solid #0b111e;
+  background: #0b111e;
+}
+
+button {
   -webkit-app-region: no-drag;
 }

@@ -10,17 +10,52 @@
 
 <body>
     <div id="notch">
-        <span id="clock">--:--:--</span>
+        <div class="top-nav" aria-hidden="true">
+            <span class="nav-label active">Nook</span>
+            <span class="nav-dot">•</span>
+            <span class="nav-label">Tray</span>
+        </div>
+
+        <div class="pane left-pane">
+            <div class="album-stack">
+                <div class="album-art">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMjAiIGhlaWdodD0iMjIwIiB2aWV3Qm94PSIwIDAgMjIwIDIyMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImcxIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMwZjRiYTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI1MCUiIHN0b3AtY29sb3I9IiMwZDhmYjgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMGIxZDNkIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnMiIgeDE9IjAiIHkxPSIxIiB4Mj0iMSIgeTI9IjAiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZjdjOTQ4IiBzdG9wLW9wYWNpdHk9IjAuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNkOTQ4MGYiIHN0b3Atb3BhY2l0eT0iMC45NSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSIyMjAiIHJ4PSIzMiIgZmlsbD0idXJsKCNnMSkiLz4KICA8Y2lyY2xlIGN4PSI3MCIgY3k9IjkyIiByPSI0MCIgZmlsbD0iI2YyZjJmMiIgb3BhY2l0eT0iMC4xNSIvPgogIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjcyIiByPSIzMiIgZmlsbD0iI2YyZjJmMiIgb3BhY2l0eT0iMC4wOCIvPgogIDxwYXRoIGQ9Ik04MyA5OGMtMi0xNCA2LTI4IDIxLTM0czMxLTMgNDMgNmMxMSA5IDE3IDIzIDE3IDM2LTEgMTktMTIgMzgtMjkgNDgtMTYgOS0zNiA4LTUyLTItMTMtOC0yMi0yMy0yNC0zOC0zLTIwIDgtNDIgMjctNTIgMTEtNiAyNC02IDM1LTEiIHN0cm9rZT0iI2Y3Yzk0OCIgc3Rya2Utd2lkdGg9IjEwIiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJN NzQgMTQzYzUgOCAxMyAxMyAyMyAxNSAxMCAyIDIwIDEgMzAtMyAxNi03IDI4LTIyIDMwLTM4IDItMTMtNC0yNi0xNC0zMy0xMi05LTMwLTgtNDEgMi04IDctMTEgMTctMTAgMjciIHN0cm9rZT0iI2YyZjRmOCIgc3Rya2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC45Ii8+CiAgPGNpcmNsZSBjeD0iNzAiIGN5PSIxNzAiIHI9IjI0IiBmaWxsPSJ1cmwoI2cyKSIvPgogIDxwYXRoIGQ9Ik02NiAxNTdoOHYyNmMwIDIgMCA0IDIgNCAxIDAgMi0yIDQtM2w4LTRjMSAwIDEgMSAxIDItMSAxLTIgMS0zIDEtNCAwLTgtMS0xMi0zLTUtMy04LTctOC0xM3oiIGZpbGw9IiMwZjE3MmEiLz4KPC9zdmc+" alt="Album art">
+                    <span class="music-badge" aria-hidden="true">♪</span>
+                </div>
+                <div class="track-details">
+                    <div class="track-title">Dibi Dibi Rek</div>
+                    <div class="track-subtitle-row">
+                        <span class="track-subtitle">Best Of</span>
+                        <div class="track-actions" aria-hidden="true">
+                            <button class="control-btn" aria-label="Share track">↗</button>
+                            <button class="control-btn" aria-label="Save track">📌</button>
+                        </div>
+                    </div>
+                    <div class="track-artist">Ismaël Lô</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pane center-pane">
+            <div class="month-label">Aug</div>
+            <div class="day-strip">
+                <span class="day muted">03</span>
+                <span class="day muted">04</span>
+                <span class="day active">
+                    <span class="dow">MON</span>
+                    <span class="date">05</span>
+                </span>
+                <span class="day muted">06</span>
+                <span class="day muted">07</span>
+            </div>
+            <div class="empty-state">Nothing for today</div>
+        </div>
+
+        <div class="pane right-pane">
+            <div class="avatar-ring">
+                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjAwIDIwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMwZjE3MmEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMTUyYjQ1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9Ijk1IiBmaWxsPSJ1cmwoI2JnKSIvPgogIDxjaXJjbGUgY3g9IjEwMCIgY3k9IjkwIiByPSI0NiIgZmlsbD0iI2Y0ZDdiZCIvPgogIDxwYXRoIGQ9Ik02NCAxNTJjNi0yNCAyOS00MCA1Mi00MHM0NSAxNiA1MiA0MCIgZmlsbD0iIzBmMTcyYSIvPgogIDxwYXRoIGQ9Ik02NiA3NmMxLTI0IDE2LTQ0IDQyLTQ2IDI1LTIgNDQgMTAgNTAgMzkgMyAxNy05IDI0LTE0IDIzLTUgMC05LTQtOC04IDAtMTAtOS0xNy0yMC0xNi0xMiAxLTIxIDExLTIxIDIzIDAgNS00IDktOSA5LTcgMC0yMC00LTIwLTI0eiIgZmlsbD0iIzFmMjkzNyIvPgogIDxjaXJjbGUgY3g9IjgwIiBjeT0iODgiIHI9IjYiIGZpbGw9IiMwZjE3MmEiLz4KICA8Y2lyY2xlIGN4PSIxMjIiIGN5PSI4OCIgcj0iNiIgZmlsbD0iIzBmMTcyYSIvPgogIDxwYXRoIGQ9Ik05NiAxMTRjNSA2IDEzIDYgMTggMCIgc3Ryb2tlPSIjYjQ1MzA5IiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjQ4IiByPSIyNCIgZmlsbD0iI2MwODRmYyIvPgo8L3N2Zz4=" alt="Avatar portrait">
+            </div>
+        </div>
     </div>
-
-    <script>
-        // Initial time
-        document.getElementById("clock").innerText = window.SmootieAPI.getTime();
-
-        // Update every second
-        window.SmootieAPI.onTick((time) => {
-            document.getElementById("clock").innerText = time;
-        });
-    </script>
 </body>
 </html>

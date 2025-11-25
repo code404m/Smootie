@@ -5,8 +5,8 @@ const path = require("path");
 let win;
 let isHidden = false;
 
-const NOTCH_WIDTH = 360;
-const NOTCH_HEIGHT = 40;
+const NOTCH_WIDTH = 760;
+const NOTCH_HEIGHT = 150;
 
 // ---------------- HIDE / SHOW (REAL HIDE) ----------------
 function hideIsland() {
