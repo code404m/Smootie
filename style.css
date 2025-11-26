@@ -8,9 +8,9 @@
   --muted: #91a2b8;
   --accent: #1fb5d5;
   --badge: #f24e60;
-  --card-radius: 24px;
+  --card-radius: 22px;
   --small-radius: 12px;
-  --shadow: 0 22px 36px rgba(0, 0, 0, 0.6);
+  --shadow: 0 18px 30px rgba(0, 0, 0, 0.6);
 }
 
 html, body {
@@ -30,11 +30,11 @@ html, body {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  width: 720px;
-  height: 138px;
-  padding: 18px 20px 16px;
+  width: 700px;
+  height: 128px;
+  padding: 14px 20px 14px;
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.65fr;
+  grid-template-columns: 1.1fr 0.9fr 0.65fr;
   gap: 16px;
   align-items: center;
   background: linear-gradient(140deg, #060a12 0%, #050810 55%, #0b1224 100%);
@@ -84,15 +84,15 @@ html, body {
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.04);
+  gap: 5px;
+  padding: 4px 11px;
+  background: rgba(255, 255, 255, 0.035);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.8px;
+  color: #a3b4cb;
+  font-size: 11px;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
@@ -112,9 +112,9 @@ html, body {
 
 .album-art {
   position: relative;
-  width: 90px;
-  height: 90px;
-  border-radius: 16px;
+  width: 86px;
+  height: 86px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -130,13 +130,13 @@ html, body {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   background: #ec4655;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #fff;
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -145,21 +145,22 @@ html, body {
 .track-details {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
 .track-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.2px;
-  color: #f9fbff;
+  letter-spacing: 0.1px;
+  color: #eaf1fc;
 }
 
 .track-subtitle-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
 }
 
 .track-subtitle {
@@ -171,16 +172,17 @@ html, body {
 .track-actions {
   display: flex;
   gap: 6px;
+  margin-left: auto;
 }
 
 .control-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: #f5f7fb;
-  border-radius: 10px;
-  font-size: 12px;
+  border-radius: 9px;
+  font-size: 11px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -192,20 +194,20 @@ html, body {
 
 .track-artist {
   font-size: 13px;
-  color: var(--muted);
+  color: #7e91ad;
 }
 
 .center-pane {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .month-label {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   text-transform: lowercase;
   align-self: flex-start;
 }
@@ -213,13 +215,13 @@ html, body {
 .day-strip {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .day {
-  min-width: 42px;
-  height: 52px;
-  border-radius: 12px;
+  min-width: 40px;
+  height: 48px;
+  border-radius: 11px;
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
   display: grid;
@@ -231,22 +233,22 @@ html, body {
 
 .day.muted {
   color: #71829b;
-  background: rgba(255, 255, 255, 0.01);
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .day.active {
-  min-width: 72px;
+  min-width: 64px;
   padding: 6px 12px;
   background: linear-gradient(135deg, #2ed2e8 0%, #0ea6df 100%);
   color: #e5f7ff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.3);
 }
 
 .day .dow {
   font-size: 10px;
   letter-spacing: 1px;
-  opacity: 0.82;
+  opacity: 0.78;
 }
 
 .day .date {
@@ -266,10 +268,10 @@ html, body {
 
 .avatar-ring {
   position: relative;
-  width: 108px;
-  height: 108px;
+  width: 102px;
+  height: 102px;
   border-radius: 50%;
-  padding: 4px;
+  padding: 3.5px;
   background: conic-gradient(from 160deg, #20d2cb, #19a6f2, #0f8fdc, #20d2cb);
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.46);
 }
