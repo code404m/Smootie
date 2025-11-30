@@ -10,17 +10,151 @@
 
 <body>
     <div id="notch">
-        <span id="clock">--:--:--</span>
+        <!-- Top bar with labels -->
+        <div id="top-bar">
+            <div class="top-pill" id="mode-pill">
+                <span class="pill-icon" id="mode-pill-icon">♪</span>
+                <span id="mode-pill-text">NOW PLAYING</span>
+            </div>
+            <div class="top-label active" id="nook-label">
+                <span class="label-icon">🏠</span>
+                <span>Nook</span>
+            </div>
+            <div class="top-label" id="tray-label">
+                <span class="label-icon">📋</span>
+                <span>Tray</span>
+            </div>
+            <div class="top-bar-right">
+            <span class="action-icon" id="settings-btn">⚙️</span>
+                <span class="action-icon" id="cloud-icon">☁️</span>
+            </div>
+        </div>
+
+        <!-- Main content area -->
+        <div id="content-area">
+            <!-- Clock Activity (default) -->
+            <div class="activity" id="clock-activity">
+                <span id="clock">--:--:--</span>
+            </div>
+
+            <!-- Music Player Activity -->
+            <div class="activity" id="music-activity" style="display: none;">
+                <div class="music-info">
+                    <div class="music-artwork" id="music-artwork"></div>
+                    <div class="music-details">
+                        <div class="music-title" id="music-title">No music playing</div>
+                        <div class="music-artist" id="music-artist">YouTube Music</div>
+                    </div>
+                </div>
+                <div class="music-controls">
+                    <button class="music-btn" id="prev-btn">⏮</button>
+                    <button class="music-btn" id="play-pause-btn">⏸</button>
+                    <button class="music-btn" id="next-btn">⏭</button>
+                </div>
+            </div>
+
+            <!-- Calendar Activity -->
+            <div class="activity" id="calendar-activity" style="display: none;">
+                <div class="calendar-header">
+                    <span id="calendar-month">Jul</span>
+                    <span id="calendar-year">2024</span>
+                </div>
+                <div class="calendar-days">
+                    <span class="calendar-day" id="day-24">24</span>
+                    <span class="calendar-day" id="day-25">25</span>
+                    <span class="calendar-day active" id="day-26">26</span>
+                    <span class="calendar-day" id="day-27">27</span>
+                    <span class="calendar-day" id="day-28">28</span>
+                </div>
+                <div class="calendar-schedule" id="calendar-schedule">No events</div>
+            </div>
+
+            <!-- Tray Activity -->
+            <div class="activity" id="tray-activity" style="display: none;">
+                <div class="tray-item">
+                    <span class="tray-icon">📥</span>
+                    <span class="tray-count">0</span>
+                </div>
+            </div>
+
+            <!-- Multi-section layout (Mode 2) -->
+            <div class="activity" id="multi-activity" style="display: none;">
+                <div class="mode2-layout">
+                    <div class="mode2-music">
+                        <div class="mode2-music-cover" id="music-artwork-compact">
+                            <div class="album-art-icon album-art-icon-phone">📞</div>
+                            <div class="album-art-icon album-art-icon-music">♪</div>
+                        </div>
+                        <div class="mode2-music-body">
+                            <div class="mode2-track-title" id="music-title-compact">Dibi Dibi Rek</div>
+                            <div class="mode2-track-meta-row">
+                                <span id="music-album-compact">BEST OF</span>
+                                <button class="mode2-icon-btn-small">↑</button>
+                                <button class="mode2-icon-btn-small">★</button>
+                            </div>
+                            <div class="mode2-track-artist" id="music-artist-compact">Ismaël Lô</div>
+                        </div>
+                    </div>
+
+                    <div class="mode2-divider"></div>
+
+                    <div class="mode2-calendar">
+                        <div class="mode2-calendar-header">
+                            <span class="mode2-month" id="calendar-month-compact">aug</span>
+                        </div>
+                        <div class="mode2-days-horizontal" id="mode2-days"></div>
+                        <div class="mode2-calendar-empty">
+                            <span class="agenda-empty-text" id="mode2-agenda-text">Nothing for today</span>
+                        </div>
+                    </div>
+
+                    <div class="mode2-divider"></div>
+
+                    <div class="mode2-mirror">
+                        <div class="mirror-photo" id="mirror-photo">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script>
-        // Initial time
-        document.getElementById("clock").innerText = window.SmootieAPI.getTime();
+    <!-- Settings Panel (overlay) -->
+    <div id="settings-panel" style="display: none;">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h2>Settings</h2>
+                <button id="close-settings">✕</button>
+            </div>
+            <div class="settings-body">
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="setting-clock" checked>
+                        Show Clock
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="setting-calendar" checked>
+                        Show Calendar
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="setting-music" checked>
+                        Show Music Player
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="setting-tray" checked>
+                        Show Tray
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Update every second
-        window.SmootieAPI.onTick((time) => {
-            document.getElementById("clock").innerText = time;
-        });
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
