@@ -4,157 +4,163 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Smootie Island</title>
-
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <div id="notch">
-        <!-- Top bar with labels -->
-        <div id="top-bar">
-            <div class="top-pill" id="mode-pill">
-                <span class="pill-icon" id="mode-pill-icon">♪</span>
-                <span id="mode-pill-text">NOW PLAYING</span>
+    <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
+    <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
+        <div class="clock-island">
+            <div class="clock-inner">
+                <div class="clock-time" id="clock-time">11:53:55</div>
+                <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
             </div>
-            <div class="top-label active" id="nook-label">
-                <span class="label-icon">🏠</span>
-                <span>Nook</span>
+        </div>
+    </div>
+
+    <!-- Mode 2: Original Nook Tray Widget -->
+    <div class="nook-tray" id="mode-nook">
+        <!-- Top Bar -->
+        <div class="nook-top-bar">
+            <div class="nook-tabs" role="tablist" aria-label="Smootie Tabs">
+                <button class="nook-tab is-active" id="tab-nook" role="tab" aria-selected="true" type="button">
+                    <span class="tab-icon" aria-hidden="true">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M7 9h10a5 5 0 0 1 5 5v1a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-1a5 5 0 0 1 5-5Z" />
+                        </svg>
+                    </span>
+                    <span class="tab-text">Smootie</span>
+                </button>
+                <button class="nook-tab" id="tab-tray" role="tab" aria-selected="false" type="button">
+                    <span class="tab-icon" aria-hidden="true">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            <polyline points="9,22 9,12 15,12 15,22" />
+                        </svg>
+                    </span>
+                    <span class="tab-text">Home</span>
+                </button>
             </div>
-            <div class="top-label" id="tray-label">
-                <span class="label-icon">📋</span>
-                <span>Tray</span>
-            </div>
-            <div class="top-bar-right">
-            <span class="action-icon" id="settings-btn">⚙️</span>
-                <span class="action-icon" id="cloud-icon">☁️</span>
+            <div class="top-bar-icons">
+                <button class="top-icon" id="settings-btn" aria-label="Settings">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="2" y="2" width="4" height="4" />
+                        <rect x="10" y="2" width="4" height="4" />
+                        <rect x="18" y="2" width="4" height="4" />
+                        <rect x="2" y="10" width="4" height="4" />
+                        <rect x="10" y="10" width="4" height="4" />
+                        <rect x="18" y="10" width="4" height="4" />
+                        <rect x="2" y="18" width="4" height="4" />
+                        <rect x="10" y="18" width="4" height="4" />
+                        <rect x="18" y="18" width="4" height="4" />
+                    </svg>
+                </button>
             </div>
         </div>
 
-        <!-- Main content area -->
-        <div id="content-area">
-            <!-- Clock Activity (default) -->
-            <div class="activity" id="clock-activity">
-                <span id="clock">--:--:--</span>
-            </div>
+        <!-- Content Area -->
+        <div class="nook-content">
+            <!-- Left Section: Music Player -->
+            <div class="nook-music">
+                <div class="music-content">
+                    <div class="album-art" id="album-art">
+                        <img src="" alt="" id="album-art-img" style="display: none;">
+                        <div class="album-badge" aria-hidden="true">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7L8 5Z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="music-info">
+                        <div class="song-title" id="song-title">Dibi Dibi Rek</div>
+                        <div class="album-label" id="album-label">Best Of</div>
+                        <div class="artist-name" id="artist-name">Ismaël Lô</div>
 
-            <!-- Music Player Activity -->
-            <div class="activity" id="music-activity" style="display: none;">
-                <div class="music-info">
-                    <div class="music-artwork" id="music-artwork"></div>
-                    <div class="music-details">
-                        <div class="music-title" id="music-title">No music playing</div>
-                        <div class="music-artist" id="music-artist">YouTube Music</div>
+                        <div class="music-controls">
+                            <button class="music-control-btn" id="prev-btn" aria-label="Previous">
+                                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M6 6v12" />
+                                    <path d="M18 6l-8 6 8 6V6Z" />
+                                </svg>
+                            </button>
+                            <button class="music-control-btn play-btn" id="play-btn" aria-label="Pause">
+                                <span class="icon-pause" aria-hidden="true">
+                                    <svg class="svg-icon" viewBox="0 0 24 24">
+                                        <path d="M8 6v12" />
+                                        <path d="M16 6v12" />
+                                    </svg>
+                                </span>
+                                <span class="icon-play" aria-hidden="true">
+                                    <svg class="svg-icon" viewBox="0 0 24 24">
+                                        <path d="M10 8l8 4-8 4V8Z" />
+                                    </svg>
+                                </span>
+                            </button>
+                            <button class="music-control-btn" id="next-btn" aria-label="Next">
+                                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M18 6v12" />
+                                    <path d="M6 6l8 6-8 6V6Z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div class="music-controls">
-                    <button class="music-btn" id="prev-btn">⏮</button>
-                    <button class="music-btn" id="play-pause-btn">⏸</button>
-                    <button class="music-btn" id="next-btn">⏭</button>
-                </div>
             </div>
 
-            <!-- Calendar Activity -->
-            <div class="activity" id="calendar-activity" style="display: none;">
+            <div class="section-divider" aria-hidden="true"></div>
+
+            <!-- Middle Section: Calendar -->
+            <div class="nook-calendar">
                 <div class="calendar-header">
-                    <span id="calendar-month">Jul</span>
-                    <span id="calendar-year">2024</span>
+                    <div class="calendar-month" id="calendar-month">Aug</div>
+                    <div class="calendar-week-dates" id="calendar-week-dates">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
-                <div class="calendar-days">
-                    <span class="calendar-day" id="day-24">24</span>
-                    <span class="calendar-day" id="day-25">25</span>
-                    <span class="calendar-day active" id="day-26">26</span>
-                    <span class="calendar-day" id="day-27">27</span>
-                    <span class="calendar-day" id="day-28">28</span>
+                <div class="calendar-events">
+                    <div class="calendar-events-icon">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M8 7h12" />
+                            <path d="M8 12h12" />
+                            <path d="M8 17h12" />
+                            <path d="M4 7h.01" />
+                            <path d="M4 12h.01" />
+                            <path d="M4 17h.01" />
+                        </svg>
+                    </div>
+                    <div class="calendar-events-text" id="calendar-events-text">Nothing for today</div>
                 </div>
-                <div class="calendar-schedule" id="calendar-schedule">No events</div>
             </div>
 
-            <!-- Tray Activity -->
-            <div class="activity" id="tray-activity" style="display: none;">
-                <div class="tray-item">
-                    <span class="tray-icon">📥</span>
-                    <span class="tray-count">0</span>
-                </div>
-            </div>
+            <div class="section-divider" aria-hidden="true"></div>
 
-            <!-- Multi-section layout (Mode 2) -->
-            <div class="activity" id="multi-activity" style="display: none;">
-                <div class="mode2-layout">
-                    <div class="mode2-music">
-                        <div class="mode2-music-cover" id="music-artwork-compact">
-                            <div class="album-art-icon album-art-icon-phone">📞</div>
-                            <div class="album-art-icon album-art-icon-music">♪</div>
-                        </div>
-                        <div class="mode2-music-body">
-                            <div class="mode2-track-title" id="music-title-compact">Dibi Dibi Rek</div>
-                            <div class="mode2-track-meta-row">
-                                <span id="music-album-compact">BEST OF</span>
-                                <button class="mode2-icon-btn-small">↑</button>
-                                <button class="mode2-icon-btn-small">★</button>
-                            </div>
-                            <div class="mode2-track-artist" id="music-artist-compact">Ismaël Lô</div>
-                        </div>
-                    </div>
-
-                    <div class="mode2-divider"></div>
-
-                    <div class="mode2-calendar">
-                        <div class="mode2-calendar-header">
-                            <span class="mode2-month" id="calendar-month-compact">aug</span>
-                        </div>
-                        <div class="mode2-days-horizontal" id="mode2-days"></div>
-                        <div class="mode2-calendar-empty">
-                            <span class="agenda-empty-text" id="mode2-agenda-text">Nothing for today</span>
-                        </div>
-                    </div>
-
-                    <div class="mode2-divider"></div>
-
-                    <div class="mode2-mirror">
-                        <div class="mirror-photo" id="mirror-photo">
-                        </div>
+            <!-- Right Section: Profile -->
+            <div class="nook-profile">
+                <div class="profile-picture" id="profile-picture">
+                    <img src="" alt="Profile" id="profile-img" style="display: none;">
+                    <div class="photo-source-overlay" id="photo-source-btn">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 7Z" />
+                            <path d="M19.4 15a7.9 7.9 0 0 0 .1-2l2-1.6-2-3.4-2.4 1a8.5 8.5 0 0 0-1.7-1l-.4-2.5H10l-.4 2.5a8.5 8.5 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.9 7.9 0 0 0 .1 2l-2 1.6 2 3.4 2.4-1a8.5 8.5 0 0 0 1.7 1l.4 2.5h4.2l.4-2.5a8.5 8.5 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z" />
+                        </svg>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Settings Panel (overlay) -->
-    <div id="settings-panel" style="display: none;">
-        <div class="settings-content">
-            <div class="settings-header">
-                <h2>Settings</h2>
-                <button id="close-settings">✕</button>
-            </div>
-            <div class="settings-body">
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="setting-clock" checked>
-                        Show Clock
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="setting-calendar" checked>
-                        Show Calendar
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="setting-music" checked>
-                        Show Music Player
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="setting-tray" checked>
-                        Show Tray
-                    </label>
-                </div>
-            </div>
+    <!-- Photo Source Selector Menu -->
+    <div class="photo-source-menu" id="photo-source-menu">
+        <div class="photo-source-header">Photo Source</div>
+        <div class="photo-source-options">
+            <button class="photo-source-option" data-source="all">All Folders</button>
+            <button class="photo-source-option" data-source="pictures">Pictures Only</button>
+            <button class="photo-source-option" data-source="desktop">Desktop Only</button>
+            <button class="photo-source-option" data-source="downloads">Downloads Only</button>
+            <button class="photo-source-option" data-source="wallpapers">Wallpapers Only</button>
+            <button class="photo-source-option" data-source="custom">Choose Custom Folder</button>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="renderer.js"></script>
 </body>
 </html>
