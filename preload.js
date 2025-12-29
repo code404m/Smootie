@@ -82,5 +82,19 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
 
     videoPrevious: () => {
         ipcRenderer.send("video-previous");
+    },
+
+    // Check if any window is maximized
+    isWindowMaximized: () => {
+        return ipcRenderer.invoke("is-window-maximized");
+    },
+
+    // Hide/show the island window
+    hideWindow: () => {
+        ipcRenderer.send("hide-island-window");
+    },
+
+    showWindow: () => {
+        ipcRenderer.send("show-island-window");
     }
 });
