@@ -479,6 +479,111 @@ function setupIpcHandlers() {
     }
   });
 
+  // Hide/show island window handlers
+  ipcMain.on("hide-island-window", () => {
+    console.log("hide-island-window IPC received");
+    if (win && !win.isDestroyed()) {
+      console.log("Hiding window - current visible state:", win.isVisible());
+      try {
+        // Disable alwaysOnTop first
+        win.setAlwaysOnTop(false);
+        // Small delay to ensure alwaysOnTop is disabled
+        setTimeout(() => {
+          win.hide();
+          console.log("Window hidden, new visible state:", win.isVisible());
+        }, 10);
+      } catch (error) {
+        console.error("Error hiding window:", error);
+      }
+    } else {
+      console.error("Window not available or destroyed");
+    }
+  });
+
+  ipcMain.on("show-island-window", () => {
+    console.log("show-island-window IPC received");
+    if (win && !win.isDestroyed()) {
+      console.log("Showing window");
+      try {
+        win.showInactive();
+        // Re-enable alwaysOnTop after showing
+        setTimeout(() => {
+          win.setAlwaysOnTop(true, "screen-saver");
+          console.log("Window shown, alwaysOnTop re-enabled");
+        }, 50);
+      } catch (error) {
+        console.error("Error showing window:", error);
+      }
+    } else {
+      console.error("Window not available or destroyed");
+    }
+  });
+
+  // Check if any window is maximized using active-win package
+  ipcMain.handle("is-window-maximized", async () => {
+    try {
+      // Use active-win to get the active window info
+      const { activeWindow } = await import("active-win");
+      const windowInfo = await activeWindow();
+      
+      if (!windowInfo || !windowInfo.bounds) {
+        return false;
+      }
+      
+      // Get screen bounds
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const screenBounds = primaryDisplay.bounds;
+      
+      // Check if the active window covers the entire screen (maximized)
+      const windowBounds = windowInfo.bounds;
+      
+      // Smart tolerance: adapts to different operating systems and desktop environments
+      let positionTolerance, sizeTolerance;
+      
+      // Detect if window is significantly offset (indicates dock, panel, or DE-specific behavior)
+      const hasSignificantOffset = Math.abs(windowBounds.x) > 50 || Math.abs(windowBounds.y) > 50;
+      
+      // Window is much larger than screen (common in some Linux DEs with scaling)
+      const isMuchLarger = windowBounds.width > screenBounds.width * 1.1 || 
+                          windowBounds.height > screenBounds.height * 1.1;
+      
+      if (hasSignificantOffset) {
+        // Likely dock user (MyDockFinder, macOS dock, Linux panels)
+        positionTolerance = 100;
+        sizeTolerance = 20;
+      } else if (isMuchLarger) {
+        // Likely Linux with scaling or multi-monitor setup
+        positionTolerance = 150;
+        sizeTolerance = 50;
+      } else {
+        // Standard Windows behavior
+        positionTolerance = 20;
+        sizeTolerance = 20;
+      }
+      
+      console.log("Smart detection - Has offset:", hasSignificantOffset, "Much larger:", isMuchLarger);
+      console.log("Tolerance - Position:", positionTolerance, "Size:", sizeTolerance);
+      console.log("Detailed comparison:");
+      console.log("Position X:", windowBounds.x, "vs", screenBounds.x, "diff:", Math.abs(windowBounds.x - screenBounds.x));
+      console.log("Position Y:", windowBounds.y, "vs", screenBounds.y, "diff:", Math.abs(windowBounds.y - screenBounds.y));
+      console.log("Width:", windowBounds.width, "vs", screenBounds.width, ">=?", windowBounds.width >= screenBounds.width - sizeTolerance);
+      console.log("Height:", windowBounds.height, "vs", screenBounds.height, ">=?", windowBounds.height >= screenBounds.height - sizeTolerance);
+      
+      const isMaximized = 
+        Math.abs(windowBounds.x - screenBounds.x) <= positionTolerance &&
+        Math.abs(windowBounds.y - screenBounds.y) <= positionTolerance &&
+        (windowBounds.width >= screenBounds.width - sizeTolerance) &&
+        (windowBounds.height >= screenBounds.height - sizeTolerance);
+      
+      console.log("Window bounds:", windowBounds, "Screen bounds:", screenBounds, "Is maximized:", isMaximized);
+      
+      return isMaximized;
+    } catch (error) {
+      console.error('Error checking maximized windows:', error.message);
+      return false;
+    }
+  });
+
 }
 
 // ---------------- APP INIT ----------------四肢

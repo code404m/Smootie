@@ -12,16 +12,17 @@ html, body {
 
 /* Shared Modes */
 .nook-tray {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   width: 100%;
   max-width: 660px;
-  height: 100%;
+  height: calc(100% - 7px);
   background: #000000;
   border-radius: 0 0 33px 33px;
   padding: 8px 16px;
+  padding-top: 3px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -29,7 +30,13 @@ html, body {
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
   overflow: hidden;
-  z-index: 9999;
+  z-index: 9999 !important;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: no-drag !important;
 }
 
 /* Hide helper */
@@ -52,13 +59,15 @@ html, body {
   box-sizing: border-box;
   position: relative;
   overflow: visible;
+  opacity: 1;
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 .clock-island {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   width: auto;
   min-width: 220px;
   background: #000000;
@@ -67,9 +76,15 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  z-index: 9999 !important;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: no-drag !important;
   box-shadow: none;
-  z-index: 9999;
-  -webkit-app-region: no-drag;
 }
 
 .clock-inner {
@@ -155,6 +170,11 @@ html, body {
   color: rgba(255, 255, 255, 0.95);
 }
 
+/* Move home tab 4px to the left */
+#tab-tray {
+  margin-left: -4px;
+}
+
 .nook-labels {
   display: flex;
   gap: 6px;
@@ -192,8 +212,8 @@ html, body {
   padding: 3px;
   border-radius: 4px;
   transition: all 0.2s;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -227,12 +247,13 @@ html, body {
   flex: 1;
   position: relative;
   z-index: 1;
+  margin-top: -4px;
 }
 
 .section-divider {
   width: 1px;
   align-self: stretch;
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.035);
   margin: 2px 0;
 }
 
@@ -338,6 +359,8 @@ html, body {
   gap: 8px;
   margin-top: 0;
   margin-top: 2px;
+  margin-left: 10px;
+  margin-top: 40px;
 }
 
 .music-control-btn {
@@ -392,6 +415,7 @@ html, body {
   align-items: flex-start;
   min-width: 270px;
   position: relative;
+  margin-top: -4px;
 }
 
 .calendar-header {
@@ -402,7 +426,7 @@ html, body {
 }
 
 .calendar-month {
-  font-size: 28px;
+  font-size: 29px;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 0.2px;
@@ -606,6 +630,41 @@ html, body {
   color: rgba(255, 255, 255, 0.9);
 }
 
+/* Corner Settings Icon */
+.corner-settings {
+  position: absolute;
+  top: -22px;
+  right: 8px;
+  z-index: 10;
+}
+
+.corner-settings-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: all 0.2s;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+
+.corner-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.corner-settings-btn .svg-icon {
+  width: 10px;
+  height: 10px;
+}
+
 /* Make the widget draggable except for interactive elements */
 body {
   -webkit-app-region: drag;
@@ -618,6 +677,7 @@ body {
 .nook-tab,
 .top-icon,
 .photo-source-option,
-.photo-source-overlay {
+.photo-source-overlay,
+.corner-settings-btn {
   -webkit-app-region: no-drag;
 }

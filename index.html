@@ -43,15 +43,15 @@
             <div class="top-bar-icons">
                 <button class="top-icon" id="settings-btn" aria-label="Settings">
                     <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <rect x="2" y="2" width="4" height="4" />
-                        <rect x="10" y="2" width="4" height="4" />
-                        <rect x="18" y="2" width="4" height="4" />
-                        <rect x="2" y="10" width="4" height="4" />
-                        <rect x="10" y="10" width="4" height="4" />
-                        <rect x="18" y="10" width="4" height="4" />
-                        <rect x="2" y="18" width="4" height="4" />
-                        <rect x="10" y="18" width="4" height="4" />
-                        <rect x="18" y="18" width="4" height="4" />
+                        <circle cx="6" cy="6" r="2" fill="white" />
+                        <circle cx="12" cy="6" r="2" fill="white" />
+                        <circle cx="18" cy="6" r="2" fill="white" />
+                        <circle cx="6" cy="12" r="2" fill="white" />
+                        <circle cx="12" cy="12" r="2" fill="white" />
+                        <circle cx="18" cy="12" r="2" fill="white" />
+                        <circle cx="6" cy="18" r="2" fill="white" />
+                        <circle cx="12" cy="18" r="2" fill="white" />
+                        <circle cx="18" cy="18" r="2" fill="white" />
                     </svg>
                 </button>
             </div>
@@ -135,29 +135,10 @@
 
             <!-- Right Section: Profile -->
             <div class="nook-profile">
-                <div class="profile-picture" id="profile-picture">
+                <div class="profile-picture" id="profile-picture" style="cursor: pointer;">
                     <img src="" alt="Profile" id="profile-img" style="display: none;">
-                    <div class="photo-source-overlay" id="photo-source-btn">
-                        <svg class="svg-icon" viewBox="0 0 24 24">
-                            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 7Z" />
-                            <path d="M19.4 15a7.9 7.9 0 0 0 .1-2l2-1.6-2-3.4-2.4 1a8.5 8.5 0 0 0-1.7-1l-.4-2.5H10l-.4 2.5a8.5 8.5 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.9 7.9 0 0 0 .1 2l-2 1.6 2 3.4 2.4-1a8.5 8.5 0 0 0 1.7 1l.4 2.5h4.2l.4-2.5a8.5 8.5 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6Z" />
-                        </svg>
-                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Photo Source Selector Menu -->
-    <div class="photo-source-menu" id="photo-source-menu">
-        <div class="photo-source-header">Photo Source</div>
-        <div class="photo-source-options">
-            <button class="photo-source-option" data-source="all">All Folders</button>
-            <button class="photo-source-option" data-source="pictures">Pictures Only</button>
-            <button class="photo-source-option" data-source="desktop">Desktop Only</button>
-            <button class="photo-source-option" data-source="downloads">Downloads Only</button>
-            <button class="photo-source-option" data-source="wallpapers">Wallpapers Only</button>
-            <button class="photo-source-option" data-source="custom">Choose Custom Folder</button>
         </div>
     </div>
 

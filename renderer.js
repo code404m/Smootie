@@ -345,104 +345,43 @@
     }
   }
 
-  // Photo source selector functionality
-  const photoSourceBtn = document.getElementById("photo-source-btn");
-  const photoSourceMenu = document.getElementById("photo-source-menu");
-  const photoSourceOptions = document.querySelectorAll(".photo-source-option");
+  // Profile picture click handler - directly open folder selection
+  const profilePicture = document.getElementById("profile-picture");
   let currentPhotoSource = localStorage.getItem("photoSource") || "all";
-
-  console.log("Photo source button found:", photoSourceBtn);
-  console.log("Photo source menu found:", photoSourceMenu);
-  console.log("Photo source options found:", photoSourceOptions.length);
-
-  // Set active state for current photo source
-  function updatePhotoSourceUI() {
-    photoSourceOptions.forEach(option => {
-      const source = option.dataset.source;
-      const isActive = (source === currentPhotoSource) || 
-                     (source === "custom" && (currentPhotoSource.startsWith("C:") || currentPhotoSource.startsWith("/") || currentPhotoSource.includes("\\")));
-      
-      if (isActive) {
-        option.classList.add("active");
-        // Update button text for custom folder
-        if (source === "custom") {
-          const customName = localStorage.getItem("customFolderName") || "Custom Folder";
-          option.textContent = customName;
-        }
-      } else {
-        option.classList.remove("active");
-        // Reset button text for custom folder only if it's not the active custom folder
-        if (source === "custom" && !isActive) {
-          option.textContent = "Choose Custom Folder";
-        }
-      }
-    });
-  }
-
-  // Toggle photo source menu
-  if (photoSourceBtn) {
-    photoSourceBtn.addEventListener("click", (e) => {
-      console.log("Photo source button clicked!");
+  
+  if (profilePicture) {
+    profilePicture.addEventListener("click", (e) => {
+      console.log("Profile picture clicked, opening folder selection...");
       e.stopPropagation();
-      if (photoSourceMenu.style.display === "block") {
-        photoSourceMenu.style.display = "none";
+      
+      // Directly open folder selection dialog
+      if (window.SmootieAPI && window.SmootieAPI.selectCustomFolder) {
+        window.SmootieAPI.selectCustomFolder().then((folderPath) => {
+          if (folderPath) {
+            currentPhotoSource = folderPath;
+            localStorage.setItem("photoSource", folderPath);
+            localStorage.setItem("customFolderName", folderPath.split('\\').pop() || folderPath.split('/').pop() || 'Custom Folder');
+            
+            console.log("Selected folder:", folderPath);
+            
+            // Load photo from selected folder
+            loadRandomPhoto();
+          } else {
+            console.log("No folder selected");
+          }
+        }).catch((error) => {
+          console.error("Error selecting folder:", error);
+        });
       } else {
-        photoSourceMenu.style.display = "block";
-        updatePhotoSourceUI();
+        console.error("Folder selection API not available");
       }
     });
   } else {
-    console.error("Photo source button not found!");
+    console.error("Profile picture element not found!");
   }
 
-  // Handle photo source selection
-  photoSourceOptions.forEach(option => {
-    option.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const selectedSource = option.dataset.source;
-      
-      if (selectedSource === "custom") {
-        // Open folder selection dialog
-        if (window.SmootieAPI && window.SmootieAPI.selectCustomFolder) {
-          window.SmootieAPI.selectCustomFolder().then((folderPath) => {
-            if (folderPath) {
-              currentPhotoSource = folderPath;
-              localStorage.setItem("photoSource", folderPath);
-              localStorage.setItem("customFolderName", folderPath.split('\\').pop() || folderPath.split('/').pop() || 'Custom Folder');
-              
-              // Update UI
-              updatePhotoSourceUI();
-              photoSourceMenu.style.display = "none";
-              
-              // Load photo from custom folder
-              loadRandomPhoto();
-            }
-          });
-        }
-      } else {
-        currentPhotoSource = selectedSource;
-        localStorage.setItem("photoSource", selectedSource);
-        localStorage.removeItem("customFolderName");
-        
-        // Update UI
-        updatePhotoSourceUI();
-        photoSourceMenu.style.display = "none";
-        
-        // Load photo from new source
-        loadRandomPhoto();
-      }
-    });
-  });
-
-  // Close menu when clicking outside
-  document.addEventListener("click", (e) => {
-    if (!photoSourceMenu.contains(e.target) && e.target !== photoSourceBtn) {
-      photoSourceMenu.style.display = "none";
-    }
-  });
-
-  // Change photo every 30 seconds
-  setInterval(loadRandomPhoto, 30000);
+  // Change photo every 2 minutes
+  setInterval(loadRandomPhoto, 120000);
 
   // Initialize with default state
   updateVideoInfo(null);
@@ -453,14 +392,20 @@
 
   // Check if any window is maximized
   function checkMaximizedWindows() {
+    console.log("Checking maximized windows...");
     if (window.SmootieAPI && window.SmootieAPI.isWindowMaximized) {
+      console.log("API available, calling isWindowMaximized...");
       window.SmootieAPI.isWindowMaximized().then((isMaximized) => {
+        console.log("API returned:", isMaximized);
         isWindowMaximized = isMaximized;
         updateIslandVisibility();
         console.log("Island hidden:", isWindowMaximized);
       }).catch((error) => {
         console.error("Error checking maximized windows:", error);
       });
+    } else {
+      console.warn("SmootieAPI.isWindowMaximized not available");
+      console.log("SmootieAPI:", window.SmootieAPI);
     }
   }
 
@@ -482,9 +427,9 @@
     }
   }
 
-  // Check maximized windows every 2 seconds
-  setInterval(checkMaximizedWindows, 2000);
+  // Check maximized windows every 500ms for faster detection
+  maximizationCheckInterval = setInterval(checkMaximizedWindows, 500);
 
   // Initial check
-  setTimeout(checkMaximizedWindows, 1000);
+  setTimeout(checkMaximizedWindows, 100);
 })();
