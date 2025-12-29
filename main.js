@@ -1,134 +1,175 @@
 // main.js
-const { app, BrowserWindow, screen, globalShortcut, ipcMain } = require("electron");
+const { app, BrowserWindow, screen, ipcMain } = require("electron");
 const path = require("path");
-const fs = require("fs");
-const { exec } = require("child_process");
-const https = require("https");
+const fs = require('fs').promises;
+const os = require('os');
 
 let win;
-let isHidden = false;
+let currentVideoInfo = null;
+let videoDetectionInterval = null;
 
-const NOTCH_WIDTH = 360;
-const NOTCH_WIDTH_EXPANDED = 600; // For multi-section layout
-const NOTCH_HEIGHT = 40;
-const NOTCH_HEIGHT_EXPANDED = 120; // For expanded activities
-const NOTCH_HEIGHT_MULTI = 120; // For multi-section layout
+const NOOK_WIDTH = 750;
+const NOOK_HEIGHT = 140;
 
-let lastKnownSize = { width: NOTCH_WIDTH, height: NOTCH_HEIGHT };
-let isRepositioning = false;
-let repositionResetTimer = null;
-
-function buildSizePayload(width, height) {
-  return {
-    width,
-    height,
-    expanded: width > NOTCH_WIDTH || height > NOTCH_HEIGHT
-  };
-}
-
-function getDisplayForWindow() {
-  if (!win || win.isDestroyed()) {
-    return screen.getPrimaryDisplay();
+// ---------------- VIDEO DETECTION (YouTube Only) ----------------四肢
+function isYouTubeWindow(windowInfo) {
+  if (!windowInfo) return { isVideo: false };
+  
+  const title = windowInfo.title || "";
+  const titleLower = title.toLowerCase();
+  const url = (windowInfo.url || "").toLowerCase();
+  
+  // Check for YouTube in title (fallback when URL is undefined)
+  if (titleLower.includes("youtube")) {
+    // Try to extract video title from window title (format: "Video Title - YouTube" or just "Video Title")
+    let videoTitle = title;
+    if (title.includes(" - YouTube")) {
+      videoTitle = title.replace(" - YouTube", "").trim();
+    } else if (title.includes(" | YouTube")) {
+      videoTitle = title.replace(" | YouTube", "").trim();
+    }
+    
+    // Remove tab numbers like (99), (1), etc. from the beginning
+    videoTitle = videoTitle.replace(/^\(\d+\)\s*/, '');
+    
+    // Check if this looks like a video page (has a title that's not just "YouTube")
+    if (videoTitle && videoTitle !== "" && videoTitle !== "YouTube" && 
+        !titleLower.includes("home") && !titleLower.includes("search") && 
+        !titleLower.includes("trending") && !titleLower.includes("subscriptions")) {
+      console.log('YouTube video detected:', videoTitle); 
+      return {
+        isVideo: true,
+        source: "youtube",
+        title: videoTitle,
+        url: url || "",
+        videoId: "detected", // We don't need the actual ID for controls
+        thumbnail: `https://img.youtube.com/vi/detected/mqdefault.jpg`
+      };
+    }
   }
-  const bounds = win.getBounds();
-  return screen.getDisplayMatching(bounds) || screen.getPrimaryDisplay();
-}
-
-function markRepositioning() {
-  isRepositioning = true;
-  clearTimeout(repositionResetTimer);
-  repositionResetTimer = setTimeout(() => {
-    isRepositioning = false;
-  }, 20);
-}
-
-function resizeAndCenter(width, height) {
-  if (!win || win.isDestroyed()) return;
-
-  if (height > 0) {
-    lastKnownSize = { width, height };
+  
+  // Original URL-based detection (for when URL is available)
+  if ((url.includes("youtube.com/watch") || url.includes("youtu.be/")) && 
+      (url.includes("v=") || url.includes("/watch") || url.includes("/embed/"))) {
+    // Extract video ID and title
+    let videoId = null;
+    try {
+      const urlObj = new URL(windowInfo.url);
+      videoId = urlObj.searchParams.get("v") || urlObj.pathname.split("/").pop().split("?")[0];
+    } catch (e) {
+      // URL parsing failed, try to extract from URL string
+      const match = url.match(/(?:watch\?v=|youtu\.be\/|embed\/)([^&\s?]+)/);
+      if (match) videoId = match[1];
+    }
+    
+    // Try to extract video title from window title (format: "Video Title - YouTube" or just "Video Title")
+    let videoTitle = title;
+    if (title.includes(" - YouTube")) {
+      videoTitle = title.replace(" - YouTube", "").trim();
+    } else if (title.includes(" | YouTube")) {
+      videoTitle = title.replace(" | YouTube", "").trim();
+    }
+    
+    // Only return video info if we have a valid video ID and title
+    if (videoId && videoTitle && videoTitle !== "" && videoTitle !== "YouTube") {
+      console.log('YouTube video detected by URL:', videoTitle); 
+      return {
+        isVideo: true,
+        source: "youtube",
+        title: videoTitle,
+        url: windowInfo.url || "",
+        videoId: videoId,
+        thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+      };
+    }
   }
-
-  const display = getDisplayForWindow();
-  const bounds = display.bounds;
-
-  const x = Math.round(bounds.x + (bounds.width - width) / 2);
-  const y = bounds.y;
-
-  markRepositioning();
-  // Use animate: true for smoother window resizing
-  win.setBounds({ x, y, width, height }, true);
+  
+  return { isVideo: false };
 }
 
-// ---------------- HIDE / SHOW (REAL HIDE) ----------------
-function hideIsland() {
-  if (!win || win.isDestroyed() || isHidden) return;
-  isHidden = true;
-
-  win.webContents.send("island-hide", buildSizePayload(lastKnownSize.width, 0));
-
-  // Shrink window to zero height
-  markRepositioning();
-  win.setSize(lastKnownSize.width, 0, true);
-}
-
-function showIsland(height = lastKnownSize.height, width = lastKnownSize.width) {
-  if (!win || win.isDestroyed()) return;
-  isHidden = false;
-
-  resizeAndCenter(width, height);
-
-  win.webContents.send("island-show", buildSizePayload(lastKnownSize.width, lastKnownSize.height));
-}
-
-function expandIsland(height = NOTCH_HEIGHT_EXPANDED, width = NOTCH_WIDTH) {
-  if (!win || win.isDestroyed() || isHidden) return;
-  resizeAndCenter(width, height);
-  win.webContents.send("island-expand", buildSizePayload(lastKnownSize.width, lastKnownSize.height));
-}
-
-function collapseIsland() {
-  if (!win || win.isDestroyed() || isHidden) return;
-  resizeAndCenter(NOTCH_WIDTH, NOTCH_HEIGHT);
-  win.webContents.send("island-collapse", buildSizePayload(lastKnownSize.width, lastKnownSize.height));
-}
-
-// ---------------- DETECTION ----------------
-function checkFullscreenState() {
-  const focused = BrowserWindow.getFocusedWindow();
-
-  if (!focused) {
-    showIsland();
-    return;
+async function checkVideoPlayback() {
+  try {
+    // Dynamic import for ES module - use activeWindow export
+    const { activeWindow } = await import("active-win");
+    const windowInfo = await activeWindow();
+    
+    // Check if it's a browser window (has URL) or known browser
+    const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
+    const title = (windowInfo?.title || "").toLowerCase();
+    const url = (windowInfo?.url || "").toLowerCase();
+    
+    // Any window with a URL is likely a browser, plus check known browsers
+    const isBrowser = (url && url.length > 0) || 
+                     ownerName.includes('chrome') || ownerName.includes('edge') || 
+                     ownerName.includes('firefox') || ownerName.includes('brave') ||
+                     ownerName.includes('opera') || ownerName.includes('safari') ||
+                     ownerName.includes('vivaldi') || ownerName.includes('arc') ||
+                     ownerName.includes('chromium') || ownerName.includes('mozilla') ||
+                     ownerName.includes('zen') || ownerName.includes('iexplore') ||
+                     ownerName.includes('explorer') || title.includes('google chrome') ||
+                     title.includes('mozilla firefox') || title.includes('microsoft edge') ||
+                     title.includes('brave') || title.includes('opera') || title.includes('safari') ||
+                     title.includes('firefox') || title.includes('mozilla') || title.includes('zen') ||
+                     title.includes('internet explorer') || title.includes('iexplore');
+    
+    if (!isBrowser) return; // Skip non-browser windows
+    
+    const videoInfo = isYouTubeWindow(windowInfo);
+    
+    console.log('Active window:', windowInfo?.title, windowInfo?.url); // Debug log
+    console.log('Video detection result:', videoInfo); // Debug log
+    
+    if (videoInfo.isVideo) {
+      // Only update if video info has changed
+      if (!currentVideoInfo || currentVideoInfo.title !== videoInfo.title) {
+        currentVideoInfo = videoInfo;
+        // Update video info in the music player
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("update-video-info", videoInfo);
+        }
+      }
+    } else {
+      // Only clear if we had video info before
+      if (currentVideoInfo) {
+        currentVideoInfo = null;
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("update-video-info", null);
+        }
+      }
+    }
+  } catch (error) {
+    // Silently handle errors (e.g., permissions, window not available)
+    console.error("Error detecting video:", error.message);
   }
+}
 
-  const isFullScreen =
-    (focused.isFullScreen && focused.isFullScreen()) ||
-    (focused.isSimpleFullScreen && focused.isSimpleFullScreen());
-  const isMaximized = focused.isMaximized && focused.isMaximized();
+function startVideoDetection() {
+  if (videoDetectionInterval) return;
+  // Check immediately on startup
+  checkVideoPlayback();
+  // Then check every 500ms (faster than before)
+  videoDetectionInterval = setInterval(checkVideoPlayback, 500);
+}
 
-  if (isFullScreen || isMaximized) {
-    hideIsland();
-    return;
+function stopVideoDetection() {
+  if (videoDetectionInterval) {
+    clearInterval(videoDetectionInterval);
+    videoDetectionInterval = null;
   }
-
-  showIsland();
 }
 
-function startFullscreenPoller() {
-  setInterval(checkFullscreenState, 350);
-}
-
-// ---------------- CREATE WINDOW ----------------
+// ---------------- CREATE WINDOW ----------------四肢
 function createWindow() {
   const primary = screen.getPrimaryDisplay();
+  const screenWidth = primary.bounds.width;
+  const screenY = primary.bounds.y || 0;
 
-  const x = Math.round(primary.bounds.x + (primary.bounds.width - NOTCH_WIDTH) / 2);
-  const y = primary.bounds.y || 0;
+  const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
+  const y = primary.bounds.y; // Always at the very top of the screen
 
   win = new BrowserWindow({
-    width: NOTCH_WIDTH,
-    height: NOTCH_HEIGHT,
+    width: NOOK_WIDTH,
+    height: NOOK_HEIGHT,
     x, y,
     frame: false,
     transparent: true,
@@ -146,8 +187,6 @@ function createWindow() {
     }
   });
 
-  win.setMovable(false);
-
   win.setAlwaysOnTop(true, "screen-saver");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.loadFile("index.html");
@@ -155,330 +194,302 @@ function createWindow() {
   win.webContents.on("did-finish-load", () => {
     setTimeout(() => {
       win.showInactive();
-      showIsland();
     }, 80);
   });
 
-  win.on("move", () => {
-    if (!isRepositioning && !isHidden) {
-      resizeAndCenter(lastKnownSize.width, lastKnownSize.height);
+  setTimeout(() => win.setPosition(x, y), 150);
+}
+
+// ---------------- IPC HANDLERS ----------------四肢
+function setupIpcHandlers() {
+  ipcMain.on("request-video-check", async () => {
+    await checkVideoPlayback();
+  });
+
+  // Test function to trigger video controls
+  ipcMain.on("test-video-controls", async () => {
+    console.log('Testing video controls...');
+    // Simulate clicking the play/pause button
+    ipcMain.emit('video-play-pause');
+  });
+
+  // Video control handlers
+  ipcMain.on("video-play-pause", async () => {
+    try {
+      console.log('Play/pause button clicked'); // Debug
+      
+      // Get current window info once and check quickly
+      const { activeWindow } = await import("active-win");
+      const windowInfo = await activeWindow();
+      const title = windowInfo?.title || "";
+      const isYouTubeByTitle = title.toLowerCase().includes("youtube");
+      
+      console.log('Active window:', title); // Debug
+      
+      // Send command if YouTube is detected (by URL or title)
+      if (windowInfo?.url && (windowInfo.url.includes("youtube.com") || windowInfo.url.includes("youtu.be"))) {
+        console.log('Sending spacebar to YouTube (by URL)'); // Debug
+        sendKeyCommand(" ");
+      } else if (isYouTubeByTitle) {
+        console.log('Sending spacebar to YouTube (by title)'); // Debug
+        sendKeyCommand(" ");
+      } else {
+        console.log('Active window is not YouTube:', title);
+      }
+    } catch (error) {
+      console.error("Error controlling video playback:", error.message);
     }
   });
-}
 
-// ---------------- SETTINGS ---------------- 
-const SETTINGS_PATH = path.join(app.getPath("userData"), "settings.json");
-const WALLPAPER_DIR = path.join(app.getPath("home"), "Downloads", "Wallpapers");
-const YOUTUBE_SCRIPT_PATH = path.join(__dirname, "youtube-detect.ps1");
-const YOUTUBE_DETECT_SCRIPT = `
-$windows = Get-Process | Where-Object { $_.MainWindowTitle -match 'youtube' }
-$result = @{
-    hasWindow = $false
-    title = $null
-}
-if ($windows -and $windows.Count -gt 0) {
-    $result.hasWindow = $true
-    $firstWithTitle = $windows | Where-Object { $_.MainWindowTitle -and $_.MainWindowTitle.Trim().Length -gt 0 } | Select-Object -First 1
-    if ($firstWithTitle) {
-        $result.title = $firstWithTitle.MainWindowTitle
-    } else {
-        $result.title = $windows[0].MainWindowTitle
+  ipcMain.on("video-next", async () => {
+    try {
+      console.log('Next button clicked'); // Debug
+      
+      const { activeWindow } = await import("active-win");
+      const windowInfo = await activeWindow();
+      const title = windowInfo?.title || "";
+      const isYouTubeByTitle = title.toLowerCase().includes("youtube");
+      
+      if (windowInfo?.url && (windowInfo.url.includes("youtube.com") || windowInfo.url.includes("youtu.be"))) {
+        console.log('Sending Shift+N to YouTube (by URL)'); // Debug
+        sendKeyCommand("+n");
+      } else if (isYouTubeByTitle) {
+        console.log('Sending Shift+N to YouTube (by title)'); // Debug
+        sendKeyCommand("+n");
+      }
+    } catch (error) {
+      console.error("Error controlling next video:", error.message);
     }
-}
-$result | ConvertTo-Json -Compress
-`;
+  });
 
-function loadSettings() {
-  try {
-    if (fs.existsSync(SETTINGS_PATH)) {
-      return JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf8"));
+  ipcMain.on("video-previous", async () => {
+    try {
+      console.log('Previous button clicked'); // Debug
+      
+      const { activeWindow } = await import("active-win");
+      const windowInfo = await activeWindow();
+      const title = windowInfo?.title || "";
+      const isYouTubeByTitle = title.toLowerCase().includes("youtube");
+      
+      if (windowInfo?.url && (windowInfo.url.includes("youtube.com") || windowInfo.url.includes("youtu.be"))) {
+        console.log('Sending Shift+P to YouTube (by URL)'); // Debug
+        sendKeyCommand("+p");
+      } else if (isYouTubeByTitle) {
+        console.log('Sending Shift+P to YouTube (by title)'); // Debug
+        sendKeyCommand("+p");
+      }
+    } catch (error) {
+      console.error("Error controlling previous video:", error.message);
     }
-  } catch (e) {
-    console.error("Error loading settings:", e);
+  });
+
+  // Helper function to send key commands
+  function sendKeyCommand(key) {
+    const { exec } = require('child_process');
+    // Use PowerShell with faster execution
+    exec(`powershell -NoProfile -Command "[System.Windows.Forms.SendKeys]::SendWait('${key}')"`, { timeout: 1000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('PowerShell error:', error);
+      } else {
+        console.log('PowerShell command executed successfully');
+      }
+    });
   }
-  return {
-    showClock: true,
-    showCalendar: true,
-    showMusic: true,
-    showTray: true,
-    musicSource: "youtube"
-  };
+
+  // Get random photo from user's computer
+  ipcMain.handle("get-random-photo", async (event, photoSource) => {
+    try {
+      const photoDirs = [];
+      const selectedSource = photoSource || "all";
+      
+      // Handle custom folder path
+      if (selectedSource.startsWith("C:") || selectedSource.startsWith("/") || selectedSource.includes("\\")) {
+        photoDirs.push(selectedSource);
+      } else if (process.platform === 'win32') {
+        // Windows - search directories based on selected source
+        switch (selectedSource) {
+          case "pictures":
+            photoDirs.push(
+              path.join(os.homedir(), 'Pictures'),
+              path.join(os.homedir(), 'Pictures', 'Wallpapers'),
+              path.join(os.homedir(), 'Pictures', 'Screenshots'),
+              'C:\\Users\\Public\\Pictures'
+            );
+            break;
+          case "desktop":
+            photoDirs.push(path.join(os.homedir(), 'Desktop'));
+            break;
+          case "downloads":
+            photoDirs.push(path.join(os.homedir(), 'Downloads'));
+            break;
+          case "wallpapers":
+            photoDirs.push(
+              path.join(os.homedir(), 'Pictures', 'Wallpapers'),
+              path.join(os.homedir(), 'Pictures', 'Screenshots')
+            );
+            // Only add common wallpaper directories if they exist
+            const commonWallpaperDirs = [
+              'C:\\Users\\Public\\Pictures',
+              'D:\\Wallpapers',
+              path.join(os.homedir(), 'AppData', 'Local', 'Packages', 'Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy', 'LocalState', 'Assets'),
+              path.join(os.homedir(), 'Pictures', 'Camera Roll')
+            ];
+            for (const dir of commonWallpaperDirs) {
+              try {
+                if (fs.existsSync(dir)) {
+                  photoDirs.push(dir);
+                }
+              } catch (e) {
+                // Skip if can't check directory
+              }
+            }
+            break;
+          case "all":
+          default:
+            photoDirs.push(
+              path.join(os.homedir(), 'Pictures'),
+              path.join(os.homedir(), 'Desktop'),
+              path.join(os.homedir(), 'Documents'),
+              path.join(os.homedir(), 'Downloads'),
+              path.join(os.homedir(), 'Pictures', 'Wallpapers'),
+              path.join(os.homedir(), 'Pictures', 'Screenshots'),
+              'C:\\Users\\Public\\Pictures',
+              'C:\\Wallpapers',
+              'D:\\Wallpapers',
+              'D:\\Pictures',
+              'D:\\Downloads'
+            );
+            break;
+        }
+      } else if (process.platform === 'darwin') {
+        // macOS
+        switch (selectedSource) {
+          case "pictures":
+            photoDirs.push(path.join(os.homedir(), 'Pictures'));
+            break;
+          case "desktop":
+            photoDirs.push(path.join(os.homedir(), 'Desktop'));
+            break;
+          case "downloads":
+            photoDirs.push(path.join(os.homedir(), 'Downloads'));
+            break;
+          case "wallpapers":
+            photoDirs.push(path.join(os.homedir(), 'Pictures', 'Wallpapers'));
+            break;
+          case "all":
+          default:
+            photoDirs.push(
+              path.join(os.homedir(), 'Pictures'),
+              path.join(os.homedir(), 'Desktop'),
+              path.join(os.homedir(), 'Documents')
+            );
+            break;
+        }
+      } else {
+        // Linux
+        switch (selectedSource) {
+          case "pictures":
+            photoDirs.push(path.join(os.homedir(), 'Pictures'));
+            break;
+          case "desktop":
+            photoDirs.push(path.join(os.homedir(), 'Desktop'));
+            break;
+          case "downloads":
+            photoDirs.push(path.join(os.homedir(), 'Downloads'));
+            break;
+          case "wallpapers":
+            photoDirs.push(path.join(os.homedir(), 'Pictures', 'Wallpapers'));
+            break;
+          case "all":
+          default:
+            photoDirs.push(
+              path.join(os.homedir(), 'Pictures'),
+              path.join(os.homedir(), 'Desktop'),
+              path.join(os.homedir(), 'Documents')
+            );
+            break;
+        }
+      }
+
+      // Supported image extensions
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'];
+      
+      // Collect all image files
+      const imageFiles = [];
+      
+      console.log('Searching for photos in directories:', photoDirs);
+      
+      for (const dir of photoDirs) {
+        try {
+          console.log('Checking directory:', dir);
+          const files = await fs.readdir(dir);
+          console.log('Found files in', dir, ':', files.length);
+          
+          for (const file of files) {
+            const ext = path.extname(file).toLowerCase();
+            if (imageExtensions.includes(ext)) {
+              imageFiles.push(path.join(dir, file));
+            }
+          }
+        } catch (err) {
+          console.log('Could not access directory:', dir, err.message);
+          // Directory doesn't exist or can't be accessed, skip it
+          continue;
+        }
+      }
+
+      console.log('Total images found:', imageFiles.length);
+      if (imageFiles.length > 0) {
+        console.log('Sample images:', imageFiles.slice(0, 3));
+      }
+
+      if (imageFiles.length === 0) {
+        return null; // No images found
+      }
+
+      // Return a random image
+      const randomIndex = Math.floor(Math.random() * imageFiles.length);
+      const selectedImage = imageFiles[randomIndex];
+      console.log('Selected image:', selectedImage);
+      return selectedImage;
+      
+    } catch (error) {
+      console.error('Error getting random photo:', error);
+      return null;
+    }
+  });
+
+  // Select custom folder for photos
+  ipcMain.handle("select-custom-folder", async () => {
+    try {
+      const { dialog } = require('electron');
+      const result = await dialog.showOpenDialog({
+        title: 'Select Photo Folder',
+        properties: ['openDirectory'],
+        buttonLabel: 'Select Folder'
+      });
+      
+      if (result.filePaths && result.filePaths.length > 0) {
+        return result.filePaths[0];
+      }
+      return null;
+    } catch (error) {
+      console.error('Error selecting folder:', error);
+      return null;
+    }
+  });
+
 }
 
-function saveSettings(settings) {
-  try {
-    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
-    return true;
-  } catch (e) {
-    console.error("Error saving settings:", e);
-    return false;
-  }
-}
-
-ipcMain.handle("get-settings", () => loadSettings());
-ipcMain.handle("save-settings", (event, settings) => saveSettings(settings));
-
-ipcMain.handle("resize-and-center", (event, width, height) => {
-  resizeAndCenter(width, height);
+// ---------------- APP INIT ----------------四肢
+app.whenReady().then(() => {
+  createWindow();
+  setupIpcHandlers();
+  startVideoDetection();
 });
 
-function buildWallpaperList() {
-  try {
-    if (!fs.existsSync(WALLPAPER_DIR)) return [];
-    const files = fs.readdirSync(WALLPAPER_DIR);
-    return files
-      .filter((file) => /\.(png|jpg|jpeg|gif|webp)$/i.test(file))
-      .map((file) => {
-        const absolute = path.join(WALLPAPER_DIR, file);
-        return `file://${absolute.replace(/\\/g, "/")}`;
-      });
-  } catch (e) {
-    return [];
-  }
-}
-
-ipcMain.handle("get-wallpapers", () => buildWallpaperList());
-
-function ensureCentered() {
-  if (!win || win.isDestroyed() || isHidden) return;
-  resizeAndCenter(lastKnownSize.width, lastKnownSize.height);
-}
-
-function registerScreenListeners() {
-  screen.on("display-metrics-changed", ensureCentered);
-  screen.on("display-added", ensureCentered);
-  screen.on("display-removed", ensureCentered);
-}
-
-// ---------------- MEDIA SESSION (YouTube Detection) ---------------- 
-let currentMediaMetadata = null;
-let mediaScanInFlight = false;
-const thumbnailCache = new Map();
-let youtubeScriptReady = false;
-
-function ensureYouTubeScript() {
-  try {
-    if (!fs.existsSync(YOUTUBE_SCRIPT_PATH)) {
-      fs.writeFileSync(YOUTUBE_SCRIPT_PATH, YOUTUBE_DETECT_SCRIPT, "utf8");
-      youtubeScriptReady = true;
-      return true;
-    }
-
-    if (!youtubeScriptReady) {
-      fs.writeFileSync(YOUTUBE_SCRIPT_PATH, YOUTUBE_DETECT_SCRIPT, "utf8");
-    }
-
-    youtubeScriptReady = true;
-    return true;
-  } catch (e) {
-    youtubeScriptReady = false;
-    return false;
-  }
-}
-
-function fetchYouTubeThumbnail(searchTitle) {
-  return new Promise((resolve) => {
-    if (!searchTitle || searchTitle.length < 3) return resolve(null);
-    if (thumbnailCache.has(searchTitle)) return resolve(thumbnailCache.get(searchTitle));
-
-    const query = encodeURIComponent(searchTitle);
-    const options = {
-      hostname: "www.youtube.com",
-      path: `/results?search_query=${query}`,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117 Safari/537.36"
-      }
-    };
-
-    const req = https.get(options, (res) => {
-      let body = "";
-      res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => {
-        const match = body.match(/\/watch\?v=([A-Za-z0-9_-]{11})/);
-        if (match && match[1]) {
-          const url = `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg`;
-          thumbnailCache.set(searchTitle, url);
-          resolve(url);
-        } else {
-          resolve(null);
-        }
-      });
-    });
-
-    req.on("error", () => resolve(null));
-  });
-}
-
-function getWindowsMediaSession() {
-  return new Promise((resolve) => {
-    if (!ensureYouTubeScript()) {
-      resolve(null);
-      return;
-    }
-
-    exec(
-      `powershell -NoProfile -ExecutionPolicy Bypass -File "${YOUTUBE_SCRIPT_PATH}"`,
-      {
-        maxBuffer: 1024 * 1024,
-        timeout: 3000,
-        windowsHide: true
-      },
-      (error, stdout) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-
-        const output = stdout?.trim();
-        if (output) {
-          try {
-            const parsed = JSON.parse(output);
-            resolve(parsed);
-            return;
-          } catch (e) {
-            resolve(null);
-            return;
-          }
-        }
-
-        resolve(null);
-      }
-    );
-  });
-}
-
-function parseYouTubeTitle(title) {
-  if (!title) return null;
-  
-  // Extract video title from browser window title
-  // Common formats:
-  // "Video Title - YouTube"
-  // "Video Title - Channel Name - YouTube"
-  // "Video Title | Channel Name - YouTube"
-  
-  // Remove " - YouTube" or " | YouTube" suffix
-  let cleanTitle = title.replace(/\s*[-|]\s*YouTube.*$/i, '').trim();
-  
-  // Try to split by " - " or " | " to get title and channel
-  const parts = cleanTitle.split(/\s*[-|]\s*/);
-  
-  if (parts.length >= 2) {
-    // Last part is usually the channel
-    const videoTitle = parts.slice(0, -1).join(' - ').trim();
-    const channel = parts[parts.length - 1].trim();
-    
-    return {
-      title: videoTitle || cleanTitle,
-      artist: channel || 'YouTube',
-      isPlaying: true,
-      source: 'youtube'
-    };
-  }
-  
-  // If no separator, use the whole thing as title
-  return {
-    title: cleanTitle || title,
-    artist: 'YouTube',
-    isPlaying: true,
-    source: 'youtube'
-  };
-}
-
-function updateMediaFromSystem() {
-  if (mediaScanInFlight) return;
-  mediaScanInFlight = true;
-
-  getWindowsMediaSession()
-    .then((session) => {
-      const hasWindow = !!session?.hasWindow;
-      const rawTitle = typeof session?.title === 'string' ? session.title.trim() : '';
-
-      if (!hasWindow) {
-        if (currentMediaMetadata) {
-          currentMediaMetadata = null;
-          if (win && !win.isDestroyed()) {
-            win.webContents.send("media-update", null);
-            collapseIsland();
-          }
-        }
-        return;
-      }
-
-      const hasUsableTitle = rawTitle.length > 0;
-      const titleForMetadata = hasUsableTitle
-        ? rawTitle
-        : (currentMediaMetadata?.rawTitle || 'YouTube');
-      const metadata = parseYouTubeTitle(titleForMetadata);
-
-      const shouldUpdate =
-        !currentMediaMetadata ||
-        currentMediaMetadata.title !== metadata.title ||
-        currentMediaMetadata.artist !== metadata.artist;
-
-      const sendMetadata = (thumbnail = null) => {
-        currentMediaMetadata = {
-          ...metadata,
-          thumbnail: thumbnail ?? currentMediaMetadata?.thumbnail ?? null,
-          rawTitle: titleForMetadata
-        };
-
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("media-update", currentMediaMetadata);
-          // Expand immediately for smoother transition
-          expandIsland(NOTCH_HEIGHT_MULTI, NOTCH_WIDTH_EXPANDED);
-        }
-      };
-
-      if (shouldUpdate) {
-        const canLookupThumb =
-          hasUsableTitle &&
-          metadata.title &&
-          metadata.title.length > 3 &&
-          metadata.title.toLowerCase() !== 'youtube';
-
-        if (canLookupThumb) {
-          fetchYouTubeThumbnail(metadata.title)
-            .then((thumb) => sendMetadata(thumb))
-            .catch(() => sendMetadata(null));
-        } else {
-          sendMetadata(null);
-        }
-      } else if (!currentMediaMetadata) {
-        sendMetadata(null);
-      } else {
-        // Ensure the notch stays expanded even if metadata hasn't changed
-        expandIsland(NOTCH_HEIGHT_MULTI, NOTCH_WIDTH_EXPANDED);
-      }
-    })
-    .catch(() => {
-      // Silent fail
-    })
-    .finally(() => {
-      mediaScanInFlight = false;
-    });
-}
-
-function startMediaSessionMonitor() {
-  // Check frequently for YouTube windows; lighter detection ensures we react quickly
-  setInterval(() => {
-    updateMediaFromSystem();
-  }, 600);
-  
-  // Also check immediately and after a short delay
-  updateMediaFromSystem();
-  setTimeout(() => updateMediaFromSystem(), 700);
-}
-
-// ---------------- APP INIT ----------------
-app.whenReady().then(() => {
-  registerScreenListeners();
-  createWindow();
-  startFullscreenPoller();
-  startMediaSessionMonitor();
-
-  globalShortcut.register("F11", () => {
-    setTimeout(checkFullscreenState, 150);
-  });
+app.on("will-quit", () => {
+  stopVideoDetection();
 });
 
 app.on("activate", () => {

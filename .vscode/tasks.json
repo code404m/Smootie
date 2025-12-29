@@ -3,12 +3,10 @@
 	"tasks": [
 		{
 			"type": "npm",
-			"script": "install",
-			"path": "Smootie",
-			"group": "clean",
+			"script": "start",
 			"problemMatcher": [],
-			"label": "npm: install - Smootie",
-			"detail": "install dependencies from package"
+			"label": "npm: start",
+			"detail": "electron ."
 		}
 	]
 }

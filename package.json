@@ -7,5 +7,8 @@
   },
   "devDependencies": {
     "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "active-win": "^9.0.0"
   }
 }

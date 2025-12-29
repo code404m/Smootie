@@ -26,53 +26,61 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
         }, 1000);
     },
 
-    // Get current date info
-    getDate: () => {
-        const now = new Date();
-        return {
-            day: now.getDate(),
-            month: now.toLocaleString("en-GB", { month: "short" }),
-            year: now.getFullYear(),
-            dayOfWeek: now.toLocaleString("en-GB", { weekday: "short" })
-        };
+    // Listen for mode switches
+    onModeSwitch: (callback) => {
+        ipcRenderer.on("switch-mode", (event, data) => {
+            callback(data);
+        });
     },
 
-    // Media session handlers
-    onMediaUpdate: (callback) => {
-        ipcRenderer.on("media-update", (event, data) => callback(data));
+    // Listen for video info updates
+    onVideoInfoUpdate: (callback) => {
+        ipcRenderer.on("update-video-info", (event, videoInfo) => {
+            callback(videoInfo);
+        });
+    },
+
+    // Listen for island show/hide
+    onIslandHide: (callback) => {
+        ipcRenderer.on("island-hide", () => callback());
     },
 
     onIslandShow: (callback) => {
-        ipcRenderer.on("island-show", (event, dimensions) => callback(dimensions));
+        ipcRenderer.on("island-show", () => callback());
     },
 
-    onIslandHide: (callback) => {
-        ipcRenderer.on("island-hide", (event, dimensions) => callback(dimensions));
+    // Request video check
+    requestVideoCheck: () => {
+        ipcRenderer.send("request-video-check");
     },
 
-    onIslandExpand: (callback) => {
-        ipcRenderer.on("island-expand", (event, dimensions) => callback(dimensions));
+    // Get random photo from user's computer
+    getRandomPhoto: (photoSource) => {
+        return ipcRenderer.invoke("get-random-photo", photoSource);
     },
 
-    onIslandCollapse: (callback) => {
-        ipcRenderer.on("island-collapse", (event, dimensions) => callback(dimensions));
+    // Select custom folder for photos
+    selectCustomFolder: () => {
+        return ipcRenderer.invoke("select-custom-folder");
     },
 
-    // Settings
-    getSettings: () => {
-        return ipcRenderer.invoke("get-settings");
+    // Listen for photo updates
+    onPhotoUpdate: (callback) => {
+        ipcRenderer.on("update-photo", (event, photoPath) => {
+            callback(photoPath);
+        });
     },
 
-    saveSettings: (settings) => {
-        return ipcRenderer.invoke("save-settings", settings);
+    // Video control functions
+    videoPlayPause: () => {
+        ipcRenderer.send("video-play-pause");
     },
 
-    // Resize and center window
-    resizeAndCenter: (width, height) => {
-        return ipcRenderer.invoke("resize-and-center", width, height);
+    videoNext: () => {
+        ipcRenderer.send("video-next");
     },
 
-    getWallpapers: () => {
-        return ipcRenderer.invoke("get-wallpapers");
+    videoPrevious: () => {
+        ipcRenderer.send("video-previous");
     }
 });
