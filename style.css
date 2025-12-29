@@ -270,8 +270,8 @@ html, body {
 }
 
 .album-art {
-  width: 66px;
-  height: 66px;
+  width: 68px;
+  height: 68px;
   border-radius: 10px;
   background: #333;
   overflow: hidden;
@@ -280,6 +280,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
+  margin-left: 5px;
 }
 
 .album-badge {
@@ -499,7 +500,7 @@ html, body {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   margin-top: 0;
-  top: calc(100% + 2px);
+  top: calc(100% + 6px);
   left: calc(50% + 28px);
   transform: translateX(-50%);
   white-space: nowrap;
@@ -581,13 +582,13 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-top: 10px;
+  padding-top: 0px;
 }
 
 .profile-picture {
   width: 68px;
   height: 68px;
-  border-radius: 50%;
+  border-radius: 10px;
   overflow: hidden;
   background: #222;
   display: flex;
@@ -595,6 +596,7 @@ html, body {
   justify-content: center;
   align-self: center;
   position: relative;
+  margin-right: 4px;
 }
 
 .profile-picture img {
