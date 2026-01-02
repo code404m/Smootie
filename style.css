@@ -29,7 +29,7 @@ html, body {
   border: none;
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
-  overflow: hidden;
+  overflow: visible;
   z-index: 9999 !important;
   opacity: 1;
   transition: opacity 0.3s ease-out;
@@ -239,6 +239,39 @@ html, body {
   color: #ffffff;
 }
 
+ .menu-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  transform: translateX(-84px);
+  min-width: 180px;
+  background: rgba(0, 0, 0, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  z-index: 10000;
+ }
+
+ .menu-item {
+  width: 100%;
+  background: rgba(20, 20, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+ }
+
+ .menu-item:hover {
+  background: rgba(35, 35, 35, 0.85);
+ }
+
 /* Content Area */
 .nook-content {
   display: flex;
@@ -247,7 +280,7 @@ html, body {
   flex: 1;
   position: relative;
   z-index: 1;
-  margin-top: -4px;
+  margin-top: -2px;
 }
 
 .section-divider {
@@ -267,11 +300,12 @@ html, body {
   display: flex;
   gap: 12px;
   align-items: center;
+  position: relative;
 }
 
 .album-art {
-  width: 68px;
-  height: 68px;
+  width: 80px;
+  height: 80px;
   border-radius: 10px;
   background: #333;
   overflow: hidden;
@@ -281,20 +315,11 @@ html, body {
   justify-content: center;
   position: relative;
   margin-left: 5px;
+  margin-top: -5px;
 }
 
 .album-badge {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: #ff2d55;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  display: none;
 }
 
 .album-badge .svg-icon {
@@ -320,7 +345,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  justify-content: center;
+  justify-content: flex-start;
+  height: 56px;
 }
 
 .song-title {
@@ -331,6 +357,8 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+  min-height: 20px;
+  margin-top: 5px;
 }
 
 .album-label {
@@ -341,6 +369,7 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+  min-height: 16px;
 }
 
 .artist-name {
@@ -352,16 +381,32 @@ html, body {
   text-overflow: ellipsis;
   line-height: 1.3;
   margin-bottom: 0;
+  min-height: 16px;
 }
 
 .music-controls {
+  position: absolute;
+  bottom: -6px;
+  left: 95px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 0;
-  margin-top: 2px;
-  margin-left: 10px;
-  margin-top: 40px;
+  gap: 3px;
+  z-index: 2;
+}
+
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 
 .music-control-btn {
@@ -586,9 +631,9 @@ html, body {
 }
 
 .profile-picture {
-  width: 68px;
-  height: 68px;
-  border-radius: 10px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%; /* Make it a circle */
   overflow: hidden;
   background: #222;
   display: flex;
@@ -596,7 +641,8 @@ html, body {
   justify-content: center;
   align-self: center;
   position: relative;
-  margin-right: 4px;
+  margin-right: 1px; /* Moved 2px to the left */
+  margin-top: -5px;
 }
 
 .profile-picture img {
@@ -632,41 +678,6 @@ html, body {
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* Corner Settings Icon */
-.corner-settings {
-  position: absolute;
-  top: -22px;
-  right: 8px;
-  z-index: 10;
-}
-
-.corner-settings-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 10px;
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 3px;
-  transition: all 0.2s;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-app-region: no-drag;
-}
-
-.corner-settings-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-}
-
-.corner-settings-btn .svg-icon {
-  width: 10px;
-  height: 10px;
-}
-
 /* Make the widget draggable except for interactive elements */
 body {
   -webkit-app-region: drag;
@@ -678,8 +689,9 @@ body {
 .music-control-btn,
 .nook-tab,
 .top-icon,
+.menu-menu,
+.menu-item,
 .photo-source-option,
-.photo-source-overlay,
-.corner-settings-btn {
+.photo-source-overlay {
   -webkit-app-region: no-drag;
 }

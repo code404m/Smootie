@@ -71,6 +71,13 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
         });
     },
 
+    // Listen for playback state updates
+    onPlaybackStateUpdate: (callback) => {
+        ipcRenderer.on("update-playback-state", (event, state) => {
+            callback(state);
+        });
+    },
+
     // Video control functions
     videoPlayPause: () => {
         ipcRenderer.send("video-play-pause");
@@ -96,5 +103,10 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
 
     showWindow: () => {
         ipcRenderer.send("show-island-window");
+    },
+
+    // Quit the app
+    quitApp: () => {
+        ipcRenderer.send("quit-app");
     }
 });
