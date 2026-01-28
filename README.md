@@ -36,7 +36,7 @@ sudo zypper install xdotool wmctrl
 ```
 
 ### macOS
-1. Download from here: https://www.dropbox.com/home/Smootie
+1. Download from here: [https://www.dropbox.com/home/Smootie](https://www.dropbox.com/scl/fo/dl4yksdk5963yryi86uot/AHj1LXsoaBKTtpVPDzFRrxo?rlkey=4ls1bv310it2nowbn5h9dimr1&st=h7olzyh7&dl=0)
 2. Run `Smootie.exe`
 
 ## 🚀 Features
