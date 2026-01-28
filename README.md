@@ -12,7 +12,6 @@ A beautiful desktop widget that displays time, date, and YouTube video informati
 
 ### Windows
 1. You can download the latest version from here: https://www.dropbox.com/home/Smootie
-      OR
 1. Download `Smootie-win32-x64.zip`
 2. Extract and run `Smootie.exe`
 
