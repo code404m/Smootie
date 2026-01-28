@@ -6,8 +6,13 @@
   let isPlaying = true;
   let currentMode = 1; // 1 = clock mode, 2 = nook mode
   let lastGoodThumbnailUrl = null;
+  let lastVideoDetectedAt = 0;
+  let lastVideoCheckRequestAt = 0;
+  const DEFAULT_ALBUM_ART = "smootie album .jpeg";
+  const VIDEO_INFO_GRACE_MS = 4000;
+  const VIDEO_CHECK_COOLDOWN_MS = 2000;
 
-  const DEBUG_LOGS = false;
+  const DEBUG_LOGS = true;
   function debugLog(...args) {
     if (DEBUG_LOGS) console.log(...args);
   }
@@ -210,26 +215,7 @@
     const now = new Date();
     const monthEl = document.getElementById("calendar-month");
     const weekDatesEl = document.getElementById("calendar-week-dates");
-    const dayLabelFor = (dayIndex) => {
-      switch (dayIndex) {
-        case 0:
-          return "S";
-        case 1:
-          return "MON";
-        case 2:
-          return "T";
-        case 3:
-          return "W";
-        case 4:
-          return "T";
-        case 5:
-          return "F";
-        case 6:
-          return "S";
-        default:
-          return "";
-      }
-    };
+    const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     
     if (monthEl) {
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -252,7 +238,7 @@
 
         const dayLabelEl = document.createElement("div");
         dayLabelEl.className = "calendar-day-label";
-        dayLabelEl.textContent = dayLabelFor(dateObj.getDay());
+        dayLabelEl.textContent = isToday ? dayLabels[dateObj.getDay()] : dayLabels[dateObj.getDay()].charAt(0);
 
         const dateNumberEl = document.createElement("div");
         dateNumberEl.className = "calendar-date-number";
@@ -267,14 +253,41 @@
   updateCalendar();
   setInterval(updateCalendar, 60000); // Update every minute
 
-  // Update video/music information
+  // Update video/music information with debouncing
+  let updateVideoInfoTimeout = null;
   function updateVideoInfo(videoInfo) {
-    // Only update currentVideoInfo if we received valid video info
-    // This preserves the last known video info when switching apps
-    if (videoInfo && videoInfo.title && videoInfo.title !== "No video playing") {
-      currentVideoInfo = videoInfo;
+    // Clear pending update to prevent rapid DOM changes
+    if (updateVideoInfoTimeout) {
+      clearTimeout(updateVideoInfoTimeout);
     }
-    // If videoInfo is null, keep the last known state (don't clear immediately)
+    
+    updateVideoInfoTimeout = setTimeout(() => {
+      updateVideoInfoImmediate(videoInfo);
+      updateVideoInfoTimeout = null;
+    }, 100); // Debounce DOM updates
+  }
+  
+  function shouldShowVideoInfo() {
+    if (!currentVideoInfo) return false;
+    return (Date.now() - lastVideoDetectedAt) < VIDEO_INFO_GRACE_MS;
+  }
+
+  function requestThrottledVideoCheck() {
+    if (!window.SmootieAPI?.requestVideoCheck) return;
+    const now = Date.now();
+    if (now - lastVideoCheckRequestAt < VIDEO_CHECK_COOLDOWN_MS) {
+      return;
+    }
+    lastVideoCheckRequestAt = now;
+    window.SmootieAPI.requestVideoCheck();
+  }
+
+  function updateVideoInfoImmediate(videoInfo) {
+    const incomingVideo = videoInfo && videoInfo.title && videoInfo.title !== "No video playing";
+    if (incomingVideo) {
+      currentVideoInfo = videoInfo;
+      lastVideoDetectedAt = Date.now();
+    }
 
     debugLog('Received video info:', JSON.stringify(videoInfo, null, 2));
     
@@ -283,10 +296,16 @@
     const artistNameEl = document.getElementById("artist-name");
     const albumArtEl = document.getElementById("album-art-img");
     
-    // Use currentVideoInfo (which preserves last known state) instead of videoInfo parameter
-    const displayInfo = currentVideoInfo;
-    
-    if (displayInfo && displayInfo.title && displayInfo.title !== "No video playing") {
+    if (shouldShowVideoInfo()) {
+      const displayInfo = currentVideoInfo;
+      if (!displayInfo) {
+        // Nothing stored yet, fall back to default art
+        if (albumArtEl) {
+          albumArtEl.src = DEFAULT_ALBUM_ART;
+          albumArtEl.style.display = "block";
+        }
+        return;
+      }
       debugLog('Showing video info:', displayInfo.title);
       // Show video info when YouTube video is detected
       if (songTitleEl) {
@@ -360,9 +379,9 @@
         }
 
         // If we still don't have a thumbnail URL, try to request it via API if available
-        if (!thumbnailUrl && displayInfo.title && window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
+        if (!thumbnailUrl && displayInfo.title) {
           debugLog('No thumbnail URL found, requesting video check to trigger API resolution');
-          window.SmootieAPI.requestVideoCheck();
+          requestThrottledVideoCheck();
         }
 
         // If we still don't have a thumbnail, keep showing the last good one to avoid flicker
@@ -375,7 +394,7 @@
         
         if (thumbnailUrl) {
           if (albumArtEl.src !== thumbnailUrl) {
-            albumArtEl.src = thumbnailUrl;
+            optimizedThumbnailLoad(albumArtEl, thumbnailUrl);
           }
           debugLog('Setting album art src to:', thumbnailUrl);
 
@@ -411,6 +430,7 @@
         }
       }
     } else {
+      currentVideoInfo = null;
       debugLog('Hiding all video info');
       // No video playing - hide all video info completely
       if (songTitleEl) {
@@ -423,83 +443,179 @@
         artistNameEl.textContent = "";
       }
       if (albumArtEl) {
-        albumArtEl.style.display = "none";
+        albumArtEl.src = DEFAULT_ALBUM_ART;
+        albumArtEl.style.display = "block";
       }
+      lastGoodThumbnailUrl = null;
 
       // Keep lastGoodThumbnailUrl so the next detection doesn't flicker to placeholder while resolving
     }
   }
 
-  // Update playback state (playing/paused)
-  function updatePlaybackState(state) {
-    const playBtn = document.getElementById("play-btn");
-    if (!playBtn) return;
+  // Optimize thumbnail loading with lazy loading and error handling
+  function optimizedThumbnailLoad(imgElement, src) {
+    if (!imgElement || !src) return;
     
+    // Use requestIdleCallback for non-critical loading
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        imgElement.src = src;
+      }, { timeout: 1000 });
+    } else {
+      // Fallback for browsers without requestIdleCallback
+      setTimeout(() => {
+        imgElement.src = src;
+      }, 100);
+    }
+  }
+
+  // Update playback state (playing/paused)
+  let playBtn = null;
+  let prevBtn = null;
+  let nextBtn = null;
+  let controlsInitialized = false;
+  let playToggleInFlight = false;
+  let logicalPlaybackState = "paused"; // Our best guess of current playback state
+
+  function updatePlaybackState(state) {
+    if (!playBtn) return;
+
     if (state === 'playing') {
+      logicalPlaybackState = 'playing';
       playBtn.classList.remove("is-paused");
       playBtn.setAttribute("aria-label", "Pause");
     } else if (state === 'paused') {
+      logicalPlaybackState = 'paused';
       playBtn.classList.add("is-paused");
       playBtn.setAttribute("aria-label", "Play");
     } else {
       // Unknown state, keep as generic toggle
+      logicalPlaybackState = null;
       playBtn.classList.remove("is-paused");
       playBtn.setAttribute("aria-label", "Play/Pause");
     }
   }
 
-  // Music controls
-  const playBtn = document.getElementById("play-btn");
-  const prevBtn = document.getElementById("prev-btn");
-  const nextBtn = document.getElementById("next-btn");
-  let playToggleInFlight = false;
-  
-  if (playBtn) {
-    playBtn.classList.remove("is-paused");
-    playBtn.setAttribute("aria-label", "Play/Pause");
+  function setupMusicControls() {
+    if (controlsInitialized) {
+      debugLog("Music controls already initialized");
+      return;
+    }
 
-    playBtn.addEventListener("click", () => {
-      if (playToggleInFlight) return;
-      playToggleInFlight = true;
-      playBtn.classList.add("is-busy");
+    playBtn = document.getElementById("play-btn");
+    prevBtn = document.getElementById("prev-btn");
+    nextBtn = document.getElementById("next-btn");
 
-      // Send play/pause command to YouTube
-      if (window.SmootieAPI && window.SmootieAPI.videoPlayPause) {
-        window.SmootieAPI.videoPlayPause();
-      }
-
-      // Do not try to infer actual playback state; keep button as a toggle control.
-      // This avoids the UI appearing “inverted” when YouTube was already paused/playing.
-
-      setTimeout(() => {
-        playToggleInFlight = false;
-        playBtn.classList.remove("is-busy");
-      }, 450);
+    debugLog("Setting up music controls:", {
+      playBtn: !!playBtn,
+      prevBtn: !!prevBtn,
+      nextBtn: !!nextBtn,
+      apiAvailable: !!(window.SmootieAPI && window.SmootieAPI.videoPlayPause)
     });
+
+    // If the elements are not yet present (script loaded before DOM), try again shortly.
+    if (!playBtn && !prevBtn && !nextBtn) {
+      debugLog("Buttons not found, retrying in 50ms");
+      setTimeout(setupMusicControls, 50);
+      return;
+    }
+
+    if (playBtn) {
+      // Default to paused state visually (show Play icon).
+      // This keeps the button semantics intuitive when a YouTube video is initially paused.
+      logicalPlaybackState = 'paused';
+      updatePlaybackState(logicalPlaybackState);
+
+      playBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        debugLog("Play button clicked");
+        
+        if (playToggleInFlight) {
+          debugLog("Play toggle already in flight, ignoring");
+          return;
+        }
+        playToggleInFlight = true;
+        playBtn.classList.add("is-busy");
+
+        // Toggle our logical playback state and update visuals accordingly
+        const nextState = logicalPlaybackState === 'playing' ? 'paused' : 'playing';
+        logicalPlaybackState = nextState;
+        updatePlaybackState(nextState || 'paused');
+
+        // Send play/pause command to YouTube
+        if (window.SmootieAPI && window.SmootieAPI.videoPlayPause) {
+          debugLog("Calling videoPlayPause API");
+          window.SmootieAPI.videoPlayPause();
+        } else {
+          console.error("SmootieAPI.videoPlayPause not available");
+        }
+
+        setTimeout(() => {
+          playToggleInFlight = false;
+          playBtn.classList.remove("is-busy");
+        }, 450);
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        debugLog("Previous button clicked");
+        
+        // Visual feedback
+        prevBtn.style.opacity = '0.5';
+        setTimeout(() => {
+          prevBtn.style.opacity = '';
+        }, 200);
+        
+        // Send previous command to YouTube
+        if (window.SmootieAPI && window.SmootieAPI.videoPrevious) {
+          debugLog("Calling videoPrevious API");
+          window.SmootieAPI.videoPrevious();
+        } else {
+          console.error("SmootieAPI.videoPrevious not available");
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        debugLog("Next button clicked");
+        
+        // Visual feedback
+        nextBtn.style.opacity = '0.5';
+        setTimeout(() => {
+          nextBtn.style.opacity = '';
+        }, 200);
+        
+        // Send next command to YouTube
+        if (window.SmootieAPI && window.SmootieAPI.videoNext) {
+          debugLog("Calling videoNext API");
+          window.SmootieAPI.videoNext();
+        } else {
+          console.error("SmootieAPI.videoNext not available");
+        }
+      });
+    }
+
+    controlsInitialized = true;
   }
 
-  if (prevBtn) {
-    prevBtn.addEventListener("click", () => {
-      // Send previous command to YouTube
-      if (window.SmootieAPI && window.SmootieAPI.videoPrevious) {
-        window.SmootieAPI.videoPrevious();
-      }
-    });
-  }
-
-  if (nextBtn) {
-    nextBtn.addEventListener("click", () => {
-      // Send next command to YouTube
-      if (window.SmootieAPI && window.SmootieAPI.videoNext) {
-        window.SmootieAPI.videoNext();
-      }
-    });
+  // Ensure control listeners are attached after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMusicControls, { once: true });
+  } else {
+    setupMusicControls();
   }
 
   // Top bar buttons
   const menuBtn = document.getElementById("menu-btn");
   const menuMenu = document.getElementById("menu-menu");
-  const menuChooseFolder = document.getElementById("menu-choose-folder");
+  const menuStartupToggle = document.getElementById("menu-startup-toggle");
   const homeTabBtn = document.getElementById("tab-tray");
   
   if (menuBtn) {
@@ -513,6 +629,45 @@
   if (menuMenu) {
     menuMenu.addEventListener("click", (e) => {
       e.stopPropagation();
+    });
+  }
+
+  function updateStartupToggleUI(enabled) {
+    if (!menuStartupToggle) return;
+    const isEnabled = !!enabled;
+    menuStartupToggle.setAttribute("aria-pressed", isEnabled ? "true" : "false");
+    menuStartupToggle.textContent = isEnabled ? "Start with Windows (On)" : "Start with Windows (Off)";
+  }
+
+  async function initializeStartupToggle() {
+    if (!menuStartupToggle || !window.SmootieAPI?.getStartupEnabled) return;
+    try {
+      const enabled = await window.SmootieAPI.getStartupEnabled();
+      updateStartupToggleUI(enabled);
+    } catch (error) {
+      console.error("Failed to read startup toggle state:", error);
+      updateStartupToggleUI(false);
+    }
+  }
+
+  if (menuStartupToggle) {
+    initializeStartupToggle();
+    menuStartupToggle.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!window.SmootieAPI?.setStartupEnabled) return;
+      const currentState = menuStartupToggle.getAttribute("aria-pressed") === "true";
+      const nextState = !currentState;
+      updateStartupToggleUI(nextState);
+      if (menuMenu) menuMenu.style.display = "none";
+      try {
+        const result = await window.SmootieAPI.setStartupEnabled(nextState);
+        if (typeof result === "boolean") {
+          updateStartupToggleUI(result);
+        }
+      } catch (error) {
+        console.error("Failed to toggle startup:", error);
+        updateStartupToggleUI(currentState);
+      }
     });
   }
 
@@ -562,13 +717,23 @@
     setTimeout(() => window.SmootieAPI.requestVideoCheck(), 250);
   }
 
-  // Preload thumbnails to avoid showing them late when switching modes
+  // Preload thumbnails efficiently with debouncing
+  let preloadTimeout = null;
   function preloadImage(url) {
     if (!url) return;
-    const img = new Image();
-    img.decoding = "async";
-    img.loading = "eager";
-    img.src = url;
+    
+    // Debounce preload requests to avoid overwhelming the network
+    if (preloadTimeout) {
+      clearTimeout(preloadTimeout);
+    }
+    
+    preloadTimeout = setTimeout(() => {
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      img.src = url;
+      preloadTimeout = null;
+    }, 200);
   }
 
   if (window.SmootieAPI) {
@@ -627,13 +792,6 @@
     }
   }
 
-  if (menuChooseFolder) {
-    menuChooseFolder.addEventListener("click", () => {
-      if (menuMenu) menuMenu.style.display = "none";
-      choosePhotoFolder();
-    });
-  }
-  
   if (profilePicture) {
     profilePicture.addEventListener("click", (e) => {
       debugLog("Profile picture clicked, opening folder selection...");
@@ -654,26 +812,40 @@
 
   // -------- WINDOW MAXIMIZATION DETECTION --------
   let isWindowMaximized = false;
+  let visibilityTimeout = null;
 
-  // Update island visibility based on maximization state
+  // Update island visibility based on maximization state with debouncing
   function updateIslandVisibility() {
-    const nookTray = document.getElementById("mode-nook");
-    const clockMode = document.getElementById("mode-clock");
-    
-    if (nookTray && clockMode) {
-      if (isWindowMaximized) {
-        nookTray.style.display = "none";
-        clockMode.style.display = "none";
-      } else {
-        nookTray.style.display = "flex";
-        clockMode.style.display = "flex";
-      }
+    // Clear any pending visibility update
+    if (visibilityTimeout) {
+      clearTimeout(visibilityTimeout);
+      visibilityTimeout = null;
     }
+
+    // Debounce visibility changes to prevent flickering
+    visibilityTimeout = setTimeout(() => {
+      const nookTray = document.getElementById("mode-nook");
+      const clockMode = document.getElementById("mode-clock");
+      
+      if (nookTray && clockMode) {
+        if (isWindowMaximized) {
+          nookTray.style.display = "none";
+          clockMode.style.display = "none";
+          debugLog("Island hidden: window maximized");
+        } else {
+          nookTray.style.display = "flex";
+          clockMode.style.display = "flex";
+          debugLog("Island shown: window not maximized");
+        }
+      }
+      visibilityTimeout = null;
+    }, 100); // 100ms debounce
   }
 
   if (window.SmootieAPI) {
     if (window.SmootieAPI.onIslandHide) {
       window.SmootieAPI.onIslandHide(() => {
+        debugLog("Received island hide event");
         isWindowMaximized = true;
         updateIslandVisibility();
       });
@@ -681,17 +853,23 @@
 
     if (window.SmootieAPI.onIslandShow) {
       window.SmootieAPI.onIslandShow(() => {
+        debugLog("Received island show event");
         isWindowMaximized = false;
         updateIslandVisibility();
       });
     }
 
+    // Check initial maximized state on startup
     if (window.SmootieAPI.isWindowMaximized) {
       window.SmootieAPI.isWindowMaximized().then((isMaximized) => {
+        debugLog("Initial maximized state check:", isMaximized);
         isWindowMaximized = !!isMaximized;
         updateIslandVisibility();
-      }).catch(() => {
-        // ignore
+      }).catch((error) => {
+        console.error("Error checking initial maximized state:", error);
+        // Default to showing island if we can't determine state
+        isWindowMaximized = false;
+        updateIslandVisibility();
       });
     }
   }

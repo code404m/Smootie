@@ -92,7 +92,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0px;
 }
 
 .clock-time {
@@ -108,9 +108,9 @@ html, body {
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.2px;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.5);
   line-height: 1.2;
-  margin-top: 3px;
+  margin-top: 1px;
 }
 
 /* Nook Tray Widget (Mode 2) */
@@ -146,6 +146,7 @@ html, body {
   gap: 6px;
   cursor: default;
   -webkit-app-region: no-drag;
+  margin-left: -4px; /* Moved 2px to the left */
 }
 
 .nook-tab .tab-icon {
@@ -164,6 +165,7 @@ html, body {
 
 .nook-tab.is-active {
   color: rgba(255, 255, 255, 0.95);
+  margin-left: -5px; /* Moved 1px to the left */
 }
 
 .nook-tab.is-active .tab-icon {
@@ -218,6 +220,8 @@ html, body {
   align-items: center;
   justify-content: center;
   -webkit-app-region: no-drag;
+  position: fixed;
+  transform: translateX(-15px);
 }
 
 .svg-icon {
@@ -240,47 +244,23 @@ html, body {
 }
 
  .menu-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  transform: translateX(-84px);
-  min-width: 180px;
-  background: rgba(0, 0, 0, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  backdrop-filter: blur(16px) saturate(180%);
-  z-index: 10000;
+  display: none;
  }
 
  .menu-item {
-  width: 100%;
-  background: rgba(20, 20, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  text-align: left;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+  display: none;
  }
 
- .menu-item:hover {
-  background: rgba(35, 35, 35, 0.85);
- }
 
 /* Content Area */
 .nook-content {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
   flex: 1;
   position: relative;
   z-index: 1;
-  margin-top: -2px;
+  margin-top: 1px;
 }
 
 .section-divider {
@@ -304,9 +284,9 @@ html, body {
 }
 
 .album-art {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
+  width: 85px;
+  height: 85px;
+  border-radius: 25px;
   background: #333;
   overflow: hidden;
   flex-shrink: 0;
@@ -314,7 +294,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-left: 5px;
+  margin-left: 0px; /* Moved 2px to the left */
   margin-top: -5px;
 }
 
@@ -386,28 +366,14 @@ html, body {
 
 .music-controls {
   position: absolute;
-  bottom: -6px;
+  bottom: -3px; /* Moved 3px higher */
   left: 95px;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 1px;
   z-index: 2;
 }
 
-.menu-btn {
-  background: transparent;
-  border: none;
-  color: #ffffff;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 3px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-}
 
 .music-control-btn {
   background: transparent;
@@ -421,9 +387,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   -webkit-app-region: no-drag;
+  pointer-events: auto !important;
+  z-index: 10 !important;
 }
 
 .music-control-btn:hover {
@@ -454,6 +422,15 @@ html, body {
   stroke: none;
 }
 
+/* Make SVG elements inside buttons not capture pointer events */
+.music-control-btn svg,
+.music-control-btn .svg-icon,
+.music-control-btn path,
+.music-control-btn .icon-play,
+.music-control-btn .icon-pause {
+  pointer-events: none;
+}
+
 /* Middle Section: Calendar */
 .nook-calendar {
   display: flex;
@@ -461,7 +438,9 @@ html, body {
   align-items: flex-start;
   min-width: 270px;
   position: relative;
-  margin-top: -4px;
+  margin-top: -32px; /* Moved 2px higher */
+  margin-left: 0px;
+  transform: translateX(4px); /* Moved 4px to the right */
 }
 
 .calendar-header {
@@ -469,14 +448,18 @@ html, body {
   align-items: center;
   gap: 12px;
   width: 100%;
+  transform: translateX(4px); /* Moved 4px to the right */
 }
 
 .calendar-month {
-  font-size: 29px;
+  font-size: 23px;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: 0.2px;
-  margin-left: 2px;
+  margin-left: 0px;
+  padding-left: 0px;
+  position: relative;
+  left: 8px; /* Moved 3px to the left */
   margin-top: -7px;
   margin-bottom: 0;
   line-height: 1;
@@ -484,7 +467,7 @@ html, body {
 
 .calendar-week-dates {
   display: flex;
-  gap: 0;
+  gap: 0px;
   margin-bottom: 0;
   justify-content: flex-start;
   flex-wrap: nowrap;
@@ -496,7 +479,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 8px;
   transition: all 0.2s;
   min-width: 26px;
@@ -512,9 +495,9 @@ html, body {
 }
 
 .calendar-day-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.20);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-bottom: 2px;
@@ -527,7 +510,7 @@ html, body {
 .calendar-date-number {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.30);
   line-height: 1.2;
 }
 
@@ -540,15 +523,25 @@ html, body {
 .calendar-events {
   position: absolute;
   display: flex;
+  flex-direction: column; /* Stack icon above text */
   align-items: center;
-  gap: 6px;
+  gap: 2px; /* Increased gap to move text 3px down */
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
-  margin-top: 0;
-  top: calc(100% + 6px);
+  margin-top: -7px; /* Moved 2px higher */
+  top: calc(100% + 5px); /* Adjusted for 2px higher movement */
   left: calc(50% + 28px);
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateX(2px); /* Moved 2px to the right */
   white-space: nowrap;
+}
+
+.calendar-events-icon {
+  position: relative;
+  top: 7px;
+}
+
+.calendar-events-text {
+  margin-top: 4px;
 }
 
 .calendar-icon .svg-icon {
@@ -641,7 +634,7 @@ html, body {
   justify-content: center;
   align-self: center;
   position: relative;
-  margin-right: 1px; /* Moved 2px to the left */
+  margin-right: -3px; /* Moved 2px to the left */
   margin-top: -5px;
 }
 
