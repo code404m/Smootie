@@ -7,7 +7,7 @@
     "build": "electron-builder",
     "build-win": "electron-builder --win",
     "build-linux": "electron-builder --linux",
-    "package": "electron-packager . Smootie --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico",
+    "package": "electron-packager . Smootie --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --asar.unpack=**/ffmpeg.dll",
     "package-linux": "electron-packager . Smootie --platform=linux --arch=x64 --out=dist-linux --overwrite",
     "package-all": "electron-packager . Smootie --platform=all --arch=x64 --out=dist-all --overwrite",
     "dist": "npm run build"
@@ -18,27 +18,16 @@
     "directories": {
       "output": "dist"
     },
-    "win": {
-      "target": "nsis",
-      "icon": "icon.ico"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "icon.png",
-      "category": "Utility"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "icon.icns"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
     "files": [
-      "**/*",
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "style.css",
+      "smootie album .jpeg",
+      "island-mask.png",
+      "island-mask.svg",
+      "node_modules/**/*",
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
       "!**/node_modules/*.d.ts",
@@ -50,7 +39,27 @@
       "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
       "!**/{appveyor.yml,.travis.yml,circle.yml}",
       "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
-    ]
+    ],
+    "win": {
+      "target": "nsis",
+      "compression": "maximum",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "icon.png",
+      "category": "Utility"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icon.icns"
+    }
   },
   "devDependencies": {
     "electron": "^28.0.0",
