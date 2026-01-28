@@ -55,7 +55,12 @@
                     </svg>
                 </button>
                 <div class="menu-menu" id="menu-menu" style="display: none;">
-                    <button class="menu-item" id="menu-choose-folder" type="button">Choose Photos Folder</button>
+                    <button class="menu-item" id="menu-startup-toggle" type="button" aria-pressed="false">
+                        Start with Windows (Off)
+                    </button>
+                    <button class="menu-item" id="menu-choose-folder" type="button">
+                        Choose Photos Folder
+                    </button>
                 </div>
             </div>
         </div>
@@ -122,12 +127,7 @@
                 <div class="calendar-events">
                     <div class="calendar-events-icon">
                         <svg class="svg-icon" viewBox="0 0 24 24">
-                            <path d="M8 7h12" />
-                            <path d="M8 12h12" />
-                            <path d="M8 17h12" />
-                            <path d="M4 7h.01" />
-                            <path d="M4 12h.01" />
-                            <path d="M4 17h.01" />
+                            <circle cx="12" cy="12" r="5" fill="currentColor"/>
                         </svg>
                     </div>
                     <div class="calendar-events-text" id="calendar-events-text">Nothing for today</div>

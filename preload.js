@@ -96,6 +96,15 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
         return ipcRenderer.invoke("is-window-maximized");
     },
 
+    // Startup (Windows login) controls
+    getStartupEnabled: () => {
+        return ipcRenderer.invoke("get-startup-enabled");
+    },
+
+    setStartupEnabled: (enable) => {
+        return ipcRenderer.invoke("set-startup-enabled", enable);
+    },
+
     // Hide/show the island window
     hideWindow: () => {
         ipcRenderer.send("hide-island-window");
