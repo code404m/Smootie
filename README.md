@@ -11,13 +11,13 @@ A beautiful desktop widget that displays time, date, and YouTube video informati
 ## 📦 Installation
 
 ### Windows
-1. Download from here: https://www.dropbox.com/home/Smootie
-2. Run Smootie.exe.
+1. Download the latest release from the repository’s Releases section.
+2. Extract (if applicable) and run Smootie.exe.
 
 ### Linux (including Kali Linux)
-1. Download `Smootie-linux-x64.tar.gz`
-2. Extract: `tar -xzf Smootie-linux-x64.tar.gz`
-3. Run: `./Smootie`
+1. Download Smootie-linux-x64.tar.gz from the Releases section.
+2. Extract the archive: tar -xzf Smootie-linux-x64.tar.gz
+3. Run the application: ./Smootie
 
 #### Linux Dependencies
 The app requires these Linux packages for full functionality:
@@ -36,7 +36,7 @@ sudo zypper install xdotool wmctrl
 ```
 
 ### macOS
-1. Download from here: [https://www.dropbox.com/home/Smootie](https://www.dropbox.com/scl/fo/dl4yksdk5963yryi86uot/AHj1LXsoaBKTtpVPDzFRrxo?rlkey=4ls1bv310it2nowbn5h9dimr1&st=h7olzyh7&dl=0)
+1. Download the latest release from the repository’s Releases section.
 2. Run `Smootie.exe`
 
 ## 🚀 Features
@@ -100,7 +100,7 @@ The app creates a `.desktop` file in `~/.config/autostart/` for automatic startu
 - **Linux**: Any modern distribution with X11
 - **macOS**: macOS 10.14+
 - **RAM**: 100MB minimum
-- **Storage**: 200MB
+- **Storage**: 176MB
 
 ## 🎨 Customization
 
