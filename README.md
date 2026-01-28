@@ -55,7 +55,6 @@ sudo zypper install xdotool wmctrl
 - **Click clock**: Switch to widget mode
 - **Double-click background**: Switch to clock mode
 - **Right-click**: Close app
-- **Menu button**: Access settings and auto-start toggle
 
 ## 🔧 Building from Source
 
