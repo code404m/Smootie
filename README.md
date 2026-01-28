@@ -11,9 +11,8 @@ A beautiful desktop widget that displays time, date, and YouTube video informati
 ## 📦 Installation
 
 ### Windows
-1. You can download the latest version from here: https://www.dropbox.com/home/Smootie
-1. Download `Smootie-win32-x64.zip`
-2. Extract and run `Smootie.exe`
+1. Download from here: https://www.dropbox.com/home/Smootie
+2. Run Smootie.exe.
 
 ### Linux (including Kali Linux)
 1. Download `Smootie-linux-x64.tar.gz`
@@ -37,8 +36,8 @@ sudo zypper install xdotool wmctrl
 ```
 
 ### macOS
-1. Download `Smootie-darwin-x64.zip`
-2. Extract and run `Smootie.app`
+1. Download from here: https://www.dropbox.com/home/Smootie
+2. Run `Smootie.exe`
 
 ## 🚀 Features
 
@@ -51,7 +50,6 @@ sudo zypper install xdotool wmctrl
 
 ## 🎮 Controls
 
-- **M key**: Switch between modes
 - **Spacebar**: Switch between modes
 - **Click clock**: Switch to widget mode
 - **Double-click background**: Switch to clock mode
@@ -107,10 +105,9 @@ The app creates a `.desktop` file in `~/.config/autostart/` for automatic startu
 ## 🎨 Customization
 
 - **Photos**: Click profile picture to select custom photo folder
-- **Startup**: Use menu to enable/disable auto-start
 - **Position**: Widget automatically positions at top-center of screen
 
-## 🐛 Bug Reports
+## 🐛 Bug Reports (send me the report to code404m@gmail.com)
 
 Please report issues with:
 - Operating system and version
