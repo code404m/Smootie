@@ -812,9 +812,9 @@
 
   // -------- WINDOW MAXIMIZATION DETECTION --------
   let isWindowMaximized = false;
-  let visibilityTimeout = null;
 
   // Update island visibility based on maximization state with debouncing
+  let visibilityTimeout = null;
   function updateIslandVisibility() {
     // Clear any pending visibility update
     if (visibilityTimeout) {

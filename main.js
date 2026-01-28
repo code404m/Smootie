@@ -2,7 +2,8 @@
 const { app, BrowserWindow, screen, ipcMain } = require("electron");
 const https = require("https");
 const path = require("path");
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const os = require('os');
 
 // Platform detection
@@ -47,15 +48,20 @@ function getStartupEnabled() {
   try {
     if (isWindows || isMac) {
       const settings = app.getLoginItemSettings();
-      return !!settings?.openAtLogin;
+      const enabled = !!settings?.openAtLogin;
+      console.log("[startup] Current login settings:", settings);
+      console.log("[startup] Startup enabled:", enabled);
+      return enabled;
     } else if (isLinux) {
       // Linux: Check autostart desktop file
       const autostartDir = path.join(os.homedir(), '.config', 'autostart');
       const desktopFile = path.join(autostartDir, 'smootie.desktop');
       try {
         fs.accessSync(desktopFile);
+        console.log("[startup] Linux desktop file exists");
         return true;
       } catch {
+        console.log("[startup] Linux desktop file does not exist");
         return false;
       }
     }
@@ -68,6 +74,7 @@ function getStartupEnabled() {
 
 function setStartupEnabled(enable) {
   try {
+    console.log("[startup] Setting startup to:", enable);
     if (isWindows || isMac) {
       const args = [];
       if (IS_DEVELOPMENT) {
@@ -79,6 +86,10 @@ function setStartupEnabled(enable) {
         args
       });
       console.log("[startup] setLoginItemSettings:", { enable, path: process.execPath, args });
+      
+      // Verify it was set correctly
+      const newSettings = app.getLoginItemSettings();
+      console.log("[startup] New login settings:", newSettings);
       return true;
     } else if (isLinux) {
       // Linux: Create/remove autostart desktop file
@@ -99,12 +110,14 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 `;
         fs.writeFileSync(desktopFile, desktopContent);
+        console.log("[startup] Created Linux desktop file:", desktopFile);
       } else {
         // Remove desktop file
         try {
           fs.unlinkSync(desktopFile);
+          console.log("[startup] Removed Linux desktop file:", desktopFile);
         } catch {
-          // File doesn't exist, that's fine
+          console.log("[startup] Linux desktop file didn't exist, nothing to remove");
         }
       }
       console.log("[startup] Linux autostart", enable ? "enabled" : "disabled");
@@ -1169,12 +1182,78 @@ function setupIpcHandlers() {
     }
   });
 
+  // Startup handlers
+  ipcMain.handle("get-startup-enabled", async () => {
+    return getStartupEnabled();
+  });
+
+  ipcMain.handle("set-startup-enabled", async (event, enable) => {
+    return setStartupEnabled(enable);
+  });
+
   // Get random photo from user's computer
   ipcMain.handle("get-random-photo", async (event, photoSource) => {
     try {
       if (!photoSource || photoSource === "all") {
-        // For now, return null for "all" source - could be implemented later
-        return null;
+        // Try common photo directories automatically
+        const commonPhotoDirs = [
+          path.join(os.homedir(), 'Pictures'),
+          path.join(os.homedir(), 'Documents'),
+          path.join(os.homedir(), 'Desktop'),
+          path.join(os.homedir(), 'Downloads'),
+          path.join(os.homedir(), 'OneDrive', 'Pictures'),
+          path.join(os.homedir(), 'Google Drive', 'Photos')
+        ];
+
+        // Try the app directory for default photo (different paths for dev vs packaged)
+        let defaultPhotoPath;
+        if (IS_DEVELOPMENT) {
+          // Development mode - use current directory
+          defaultPhotoPath = path.join(__dirname, 'smootie album .jpeg');
+        } else {
+          // Packaged mode - try multiple possible paths
+          const possiblePaths = [
+            path.join(process.resourcesPath, 'app', 'smootie album .jpeg'),
+            path.join(__dirname, 'smootie album .jpeg'),
+            path.join(process.execPath, '..', 'resources', 'app', 'smootie album .jpeg'),
+            'D:\\Smootie\\dist-new\\Smootie-win32-x64\\resources\\app\\smootie album .jpeg'
+          ];
+          
+          for (const testPath of possiblePaths) {
+            console.log("[photo] Testing path:", testPath);
+            try {
+              await fsPromises.access(testPath);
+              defaultPhotoPath = testPath;
+              console.log("[photo] Found working path:", defaultPhotoPath);
+              break;
+            } catch {
+              console.log("[photo] Path not accessible:", testPath);
+            }
+          }
+        }
+        
+        if (defaultPhotoPath) {
+          console.log("[photo] Using default photo:", defaultPhotoPath);
+          return defaultPhotoPath;
+        } else {
+          console.log("[photo] No default photo found, searching common directories");
+          // If default photo not found, try common directories
+          for (const dir of commonPhotoDirs) {
+            try {
+              await fsPromises.access(dir);
+              const photo = await getRandomPhotoFromFolder(dir);
+              if (photo) {
+                console.log("[photo] Found photo in:", dir);
+                return photo;
+              }
+            } catch {
+              // Directory doesn't exist or no photos, continue
+              continue;
+            }
+          }
+        }
+        
+        return null; // No photos found anywhere
       }
 
       // Otherwise treat photoSource as a folder path
@@ -1198,7 +1277,7 @@ function setupIpcHandlers() {
     const imageFiles = [];
 
     try {
-      const files = await fs.readdir(folderPath);
+      const files = await fsPromises.readdir(folderPath);
 
       for (const file of files) {
         const ext = path.extname(file).toLowerCase();
@@ -1217,8 +1296,7 @@ function setupIpcHandlers() {
 
     // Return a random image
     const randomIndex = Math.floor(Math.random() * imageFiles.length);
-    const selectedImage = imageFiles[randomIndex];
-    return selectedImage;
+    return imageFiles[randomIndex];
   }
 
   // Get random photo from user's computer (legacy handler)
@@ -1302,20 +1380,25 @@ function setupIpcHandlers() {
   // Check if any window is maximized using active-win package
   ipcMain.handle("is-window-maximized", async () => {
     try {
-      // Use active-win to get the active window info
-      const windowInfo = await getActiveWindowInfo();
-      
-      if (!windowInfo || !windowInfo.bounds) {
-        return false;
-      }
-      
-      // Get screen bounds
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const screenBounds = primaryDisplay.bounds;
+      const activeWin = await import("active-win");
+      const activeWindow = activeWin.activeWindow();
+      if (!activeWindow) return false;
 
-      return computeIsMaximized(windowInfo.bounds, screenBounds);
+      const { screen } = require("electron");
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+      const { bounds } = activeWindow;
+      const isMaximized = computeIsMaximized(bounds, {
+        x: 0,
+        y: 0,
+        width: screenWidth,
+        height: screenHeight,
+      });
+
+      return isMaximized;
     } catch (error) {
-      console.error('Error checking maximized windows:', error.message);
+      console.error("Error checking maximized state:", error.message);
       return false;
     }
   });
