@@ -5,8 +5,7 @@ A beautiful desktop widget that displays time, date, and YouTube video informati
 ## 🌍 Platform Support
 
 ✅ **Windows** - Full support with PowerShell integration  
-✅ **Linux** - Full support including Kali Linux, Ubuntu, Fedora, Debian, Arch, etc.  
-✅ **macOS** - Full support  
+✅ **Linux** - Full support including Kali Linux, Ubuntu, Fedora, Debian, Arch, etc.   
 
 <img width="1920" height="1080" alt="2026-01-28_21h26_40" src="https://github.com/user-attachments/assets/059c7f81-3427-44e2-8002-0d983ab23cb5" />
 
