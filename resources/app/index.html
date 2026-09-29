@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smootie Island</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
+    <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
+        <div class="clock-island">
+            <div class="clock-inner">
+                <div class="clock-time" id="clock-time">11:53:55</div>
+                <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode 2: Original Nook Tray Widget -->
+    <div class="nook-tray" id="mode-nook">
+        <!-- Top Bar -->
+        <div class="nook-top-bar">
+            <div class="nook-tabs" role="tablist" aria-label="Smootie Tabs">
+                <button class="nook-tab is-active" id="tab-nook" role="tab" aria-selected="true" type="button">
+                    <span class="tab-icon" aria-hidden="true">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M7 9h10a5 5 0 0 1 5 5v1a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-1a5 5 0 0 1 5-5Z" />
+                        </svg>
+                    </span>
+                    <span class="tab-text">Smootie</span>
+                </button>
+                <button class="nook-tab" id="tab-tray" role="tab" aria-selected="false" type="button">
+                    <span class="tab-icon" aria-hidden="true">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            <polyline points="9,22 9,12 15,12 15,22" />
+                        </svg>
+                    </span>
+                    <span class="tab-text">Home</span>
+                </button>
+            </div>
+            <div class="top-bar-icons">
+                <button class="top-icon" id="menu-btn" aria-label="Menu">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="6" cy="6" r="2" fill="white" />
+                        <circle cx="12" cy="6" r="2" fill="white" />
+                        <circle cx="18" cy="6" r="2" fill="white" />
+                        <circle cx="6" cy="12" r="2" fill="white" />
+                        <circle cx="12" cy="12" r="2" fill="white" />
+                        <circle cx="18" cy="12" r="2" fill="white" />
+                        <circle cx="6" cy="18" r="2" fill="white" />
+                        <circle cx="12" cy="18" r="2" fill="white" />
+                        <circle cx="18" cy="18" r="2" fill="white" />
+                    </svg>
+                </button>
+                <div class="menu-menu" id="menu-menu" style="display: none;">
+                    <button class="menu-item" id="menu-startup-toggle" type="button" aria-pressed="false">
+                        Start with Windows (Off)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="nook-content">
+            <!-- Left Section: Music Player -->
+            <div class="nook-music">
+                <div class="music-content">
+                    <div class="album-art" id="album-art">
+                        <img src="" alt="" id="album-art-img" style="display: none;">
+                        <div class="album-badge" aria-hidden="true">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7L8 5Z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="music-info">
+                        <div class="song-title" id="song-title">Dibi Dibi Rek</div>
+                        <div class="album-label" id="album-label">Best Of</div>
+                        <div class="artist-name" id="artist-name">Ismaël Lô</div>
+
+                        <div class="music-controls">
+                            <button class="music-control-btn" id="prev-btn" aria-label="Previous">
+                                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M6 6v12" />
+                                    <path d="M18 6l-8 6 8 6V6Z" />
+                                </svg>
+                            </button>
+                            <button class="music-control-btn play-btn" id="play-btn" aria-label="Pause">
+                                <span class="icon-pause" aria-hidden="true">
+                                    <svg class="svg-icon" viewBox="0 0 24 24">
+                                        <path d="M8 6v12" />
+                                        <path d="M16 6v12" />
+                                    </svg>
+                                </span>
+                                <span class="icon-play" aria-hidden="true">
+                                    <svg class="svg-icon" viewBox="0 0 24 24">
+                                        <path d="M10 8l8 4-8 4V8Z" />
+                                    </svg>
+                                </span>
+                            </button>
+                            <button class="music-control-btn" id="next-btn" aria-label="Next">
+                                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M18 6v12" />
+                                    <path d="M6 6l8 6-8 6V6Z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-divider" aria-hidden="true"></div>
+
+            <!-- Middle Section: Calendar -->
+            <div class="nook-calendar">
+                <div class="calendar-header">
+                    <div class="calendar-month" id="calendar-month">Aug</div>
+                    <div class="calendar-week-dates" id="calendar-week-dates">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                <div class="calendar-events">
+                    <div class="calendar-events-icon">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <div class="calendar-events-text" id="calendar-events-text">Nothing for today</div>
+                </div>
+            </div>
+
+            <div class="section-divider" aria-hidden="true"></div>
+
+            <!-- Right Section: Profile -->
+            <div class="nook-profile">
+                <div class="profile-picture" id="profile-picture" style="cursor: pointer;">
+                    <img src="" alt="Profile" id="profile-img" style="display: none;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
