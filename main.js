@@ -38,6 +38,7 @@ let linuxProcess = null; // Linux shell process
 let psCommandQueue = [];
 let psReady = false;
 let lastPlaybackState = null; // 'playing' | 'paused' | null
+let playbackPollInterval = null;
 let playbackCheckMs = 0;
 const PLAYBACK_CHECK_INTERVAL_MS = 1200;
 let lastMediaCommandAtMs = 0;
@@ -452,9 +453,16 @@ function detectYouTubePlaybackState() {
 // Parse playback state from UI Automation output
 function parsePlaybackState(output) {
   if (!output || typeof output !== 'string') return null;
-  const lower = output.toLowerCase().trim();
-  if (lower.includes('play') && !lower.includes('pause')) return 'paused';
-  if (lower.includes('pause') && !lower.includes('play')) return 'playing';
+  const lines = output.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('SMTC:')) continue;
+    const value = trimmed.slice(5).trim().toLowerCase();
+    if (!value) continue;
+    if (value.includes('playing')) return 'playing';
+    if (value.includes('paused') || value.includes('stopped')) return 'paused';
+    if (value.includes('none')) return null;
+  }
   return null;
 }
 
@@ -984,6 +992,7 @@ function startVideoDetection() {
   if (videoDetectionInterval) return;
   // Check immediately on startup
   checkVideoPlayback();
+  startPlaybackStatePolling();
   // Then check frequently so maximization changes are detected quickly
   // 280ms is a good balance between responsiveness and CPU usage
   videoDetectionInterval = setInterval(checkVideoPlayback, 280);
@@ -993,6 +1002,51 @@ function stopVideoDetection() {
   if (videoDetectionInterval) {
     clearInterval(videoDetectionInterval);
     videoDetectionInterval = null;
+  }
+  stopPlaybackStatePolling();
+}
+
+function startPlaybackStatePolling() {
+  if (!isWindows) return;
+  if (playbackPollInterval) return;
+
+  const poll = () => {
+    const psScript = `
+      try {
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
+        $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+        $mgrOp = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()
+        try {
+          $task = [System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeSystemExtensions]::AsTask($mgrOp)
+          $mgr = $task.GetAwaiter().GetResult()
+        } catch {
+          $mgr = $mgrOp.GetResults()
+        }
+        if ($null -eq $mgr) { Write-Output "SMTC:none"; return }
+        $session = $mgr.GetCurrentSession()
+        if ($null -eq $session) { Write-Output "SMTC:none"; return }
+        $info = $session.GetPlaybackInfo()
+
+        $status = $info.PlaybackStatus
+        if ($status) { Write-Output "SMTC:$status" } else { Write-Output "SMTC:none" }
+      } catch {
+        Write-Output "SMTC:none"
+      }
+    `;
+
+    // Output will be parsed by parsePlaybackState in the PowerShell stdout handler
+    queuePowerShellCommand(psScript);
+  };
+
+  // Initial poll and interval
+  poll();
+  playbackPollInterval = setInterval(poll, 1500);
+}
+
+function stopPlaybackStatePolling() {
+  if (playbackPollInterval) {
+    clearInterval(playbackPollInterval);
+    playbackPollInterval = null;
   }
 }
 

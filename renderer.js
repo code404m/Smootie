@@ -10,7 +10,7 @@
   let lastVideoCheckRequestAt = 0;
   const DEFAULT_ALBUM_ART = "smootie album .jpeg";
   const VIDEO_INFO_GRACE_MS = 4000;
-  const VIDEO_CHECK_COOLDOWN_MS = 2000;
+  const VIDEO_CHECK_COOLDOWN_MS = 500;
 
   const DEBUG_LOGS = true;
   function debugLog(...args) {
@@ -40,16 +40,16 @@
         clockModeEl.classList.add("mode-hidden");
         nookModeEl.classList.remove("mode-hidden");
         debugLog("Switched to Mode 2 (Nook)");
-        
-        // When switching to Mode 2, update video info immediately if we have it
+
+        // Always trigger a fresh video detection when entering Mode 2
+        if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
+          window.SmootieAPI.requestVideoCheck();
+        }
+
+        // Update video info immediately if we have it
         if (currentVideoInfo) {
           debugLog("Updating video info for Mode 2:", currentVideoInfo.title);
           updateVideoInfo(currentVideoInfo);
-        } else {
-          // Request a fresh video check if we don't have video info
-          if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
-            window.SmootieAPI.requestVideoCheck();
-          }
         }
       }
     } else {
@@ -284,18 +284,33 @@
 
   function updateVideoInfoImmediate(videoInfo) {
     const incomingVideo = videoInfo && videoInfo.title && videoInfo.title !== "No video playing";
-    if (incomingVideo) {
-      currentVideoInfo = videoInfo;
-      lastVideoDetectedAt = Date.now();
-    }
-
     debugLog('Received video info:', JSON.stringify(videoInfo, null, 2));
     
     const songTitleEl = document.getElementById("song-title");
     const albumLabelEl = document.getElementById("album-label");
     const artistNameEl = document.getElementById("artist-name");
     const albumArtEl = document.getElementById("album-art-img");
-    
+
+    // If nothing is playing, show fallback art and mark paused
+    if (!incomingVideo) {
+      currentVideoInfo = null;
+      if (songTitleEl) songTitleEl.textContent = "";
+      if (albumLabelEl) albumLabelEl.textContent = "";
+      if (artistNameEl) artistNameEl.textContent = "";
+      if (albumArtEl) {
+        albumArtEl.style.display = "block";
+        if (albumArtEl.src !== DEFAULT_ALBUM_ART) {
+          optimizedThumbnailLoad(albumArtEl, DEFAULT_ALBUM_ART);
+        }
+      }
+      lastGoodThumbnailUrl = null;
+      return;
+    }
+
+    // Store new video info (playback state comes from main process SMTC updates)
+    currentVideoInfo = videoInfo;
+    lastVideoDetectedAt = Date.now();
+
     if (shouldShowVideoInfo()) {
       const displayInfo = currentVideoInfo;
       if (!displayInfo) {
@@ -484,15 +499,11 @@
       logicalPlaybackState = 'playing';
       playBtn.classList.remove("is-paused");
       playBtn.setAttribute("aria-label", "Pause");
-    } else if (state === 'paused') {
+    } else {
+      // Treat any non-playing (paused/null/undefined) as paused so the Play icon shows
       logicalPlaybackState = 'paused';
       playBtn.classList.add("is-paused");
       playBtn.setAttribute("aria-label", "Play");
-    } else {
-      // Unknown state, keep as generic toggle
-      logicalPlaybackState = null;
-      playBtn.classList.remove("is-paused");
-      playBtn.setAttribute("aria-label", "Play/Pause");
     }
   }
 
@@ -538,15 +549,18 @@
         playToggleInFlight = true;
         playBtn.classList.add("is-busy");
 
-        // Toggle our logical playback state and update visuals accordingly
+        // Optimistically flip UI so the user sees immediate feedback
         const nextState = logicalPlaybackState === 'playing' ? 'paused' : 'playing';
-        logicalPlaybackState = nextState;
-        updatePlaybackState(nextState || 'paused');
+        updatePlaybackState(nextState);
 
         // Send play/pause command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPlayPause) {
           debugLog("Calling videoPlayPause API");
           window.SmootieAPI.videoPlayPause();
+          // Force a quick state refresh so the button reflects the real YouTube state
+          if (window.SmootieAPI.requestVideoCheck) {
+            setTimeout(() => window.SmootieAPI.requestVideoCheck(), 300);
+          }
         } else {
           console.error("SmootieAPI.videoPlayPause not available");
         }
