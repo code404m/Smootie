@@ -37,26 +37,6 @@ sudo pacman -S xdotool wmctrl
 sudo zypper install xdotool wmctrl
 ```
 
-### macOS
-1. Download the latest release from the repository’s Releases section.
-2. Run `Smootie.exe`
-
-## 🚀 Features
-
-- **Clock Mode**: Minimal clock display with date
-- **Widget Mode**: Full widget with YouTube video info and controls
-- **Media Controls**: Play/pause, next, previous for YouTube
-- **Auto-start**: Option to start with your system
-- **Cross-platform**: Works on Windows, Linux, and macOS
-- **Kali Linux Compatible**: Tested and working on Kali Linux
-
-## 🎮 Controls
-
-- **Spacebar**: Switch between modes
-- **Click clock**: Switch to widget mode
-- **Double-click background**: Switch to clock mode
-- **Right-click**: Close app
-
 ## 🔧 Building from Source
 
 ```bash
@@ -72,7 +52,6 @@ npm run package-all
 # Build for specific platform
 npm run package        # Windows
 npm run package-linux  # Linux
-npm run package-mac    # macOS
 ```
 
 ## 🐧 Linux Specific Notes
