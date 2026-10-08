@@ -7,18 +7,20 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
-    <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
-        <div class="clock-island">
-            <div class="clock-inner">
-                <div class="clock-time" id="clock-time">11:53:55</div>
-                <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
+    <!-- Container for shadow space -->
+    <div class="window-container">
+        <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
+        <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
+            <div class="clock-island">
+                <div class="clock-inner">
+                    <div class="clock-time" id="clock-time">11:53:55</div>
+                    <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Mode 2: Original Nook Tray Widget -->
-    <div class="nook-tray" id="mode-nook">
+        <!-- Mode 2: Original Nook Tray Widget -->
+        <div class="nook-tray" id="mode-nook">
         <!-- Top Bar -->
         <div class="nook-top-bar">
             <div class="nook-tabs" role="tablist" aria-label="Smootie Tabs">
@@ -41,6 +43,18 @@
                 </button>
             </div>
             <div class="top-bar-icons">
+                <button class="top-icon" id="screenshot-btn" aria-label="Screenshot">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" fill="none" stroke="white" stroke-width="2"/>
+                        <circle cx="12" cy="13" r="4" fill="none" stroke="white" stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="top-icon" id="record-btn" aria-label="Record Screen">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="6" fill="white"/>
+                    </svg>
+                    <span class="recording-indicator" id="recording-indicator" style="display: none;"></span>
+                </button>
                 <button class="top-icon" id="menu-btn" aria-label="Menu">
                     <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="6" cy="6" r="2" fill="white" />
@@ -140,6 +154,7 @@
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <script src="renderer.js"></script>

@@ -1,16 +1,32 @@
 // main.js
-const { app, BrowserWindow, screen, ipcMain } = require("electron");
+const { app, BrowserWindow, screen, ipcMain, desktopCapturer, nativeImage } = require("electron");
 const https = require("https");
 const path = require("path");
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const os = require('os');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
+const koffi = require('koffi');
 
 // Platform detection
 const platform = process.platform;
 const isWindows = platform === 'win32';
 const isLinux = platform === 'linux';
-const isMac = platform === 'darwin';
+
+// Log Electron version and Windows build number
+console.log('[System Info] Electron version:', process.versions.electron);
+console.log('[System Info] Node version:', process.versions.node);
+console.log('[System Info] Chrome version:', process.versions.chrome);
+if (isWindows) {
+  console.log('[System Info] Windows version:', os.release());
+  exec('systeminfo | findstr /B /C:"OS Name" /C:"OS Version"', (error, stdout) => {
+    if (!error) {
+      console.log('[System Info]', stdout.trim());
+    }
+  });
+}
 
 let win;
 let currentVideoInfo = null;
@@ -31,6 +47,14 @@ const YOUTUBE_DEBOUNCE_MS = 500;
 
 let lastYouTubeWindowInfo = null;
 let lastYouTubeWindowAtMs = 0;
+let lastIslandVisible = null;
+let hideTimer = null;
+
+function setIslandVisible(visible) {
+  if (lastIslandVisible === visible) return;
+  lastIslandVisible = visible;
+  if (win && !win.isDestroyed()) win.webContents.send(visible ? "island-show" : "island-hide");
+}
 
 // Platform-specific process variables for media controls
 let psProcess = null; // Windows PowerShell
@@ -47,7 +71,7 @@ const IS_DEVELOPMENT = !app.isPackaged;
 
 function getStartupEnabled() {
   try {
-    if (isWindows || isMac) {
+    if (isWindows) {
       const settings = app.getLoginItemSettings();
       const enabled = !!settings?.openAtLogin;
       console.log("[startup] Current login settings:", settings);
@@ -76,7 +100,7 @@ function getStartupEnabled() {
 function setStartupEnabled(enable) {
   try {
     console.log("[startup] Setting startup to:", enable);
-    if (isWindows || isMac) {
+    if (isWindows) {
       const args = [];
       if (IS_DEVELOPMENT) {
         args.push(app.getAppPath());
@@ -473,8 +497,9 @@ function debugLog(...args) {
 
 const NOOK_WIDTH = 750;
 const NOOK_HEIGHT = 140;
+const SHADOW_PADDING = 60; // Extra space for shadow rendering
 
-// ---------------- VIDEO DETECTION (YouTube Only) ----------------四肢
+// ---------------- VIDEO DETECTION (YouTube Only) ----------------
 function computeIsMaximized(windowBounds, screenBounds) {
   let positionTolerance, sizeTolerance;
 
@@ -508,9 +533,6 @@ async function getActiveWindowInfo() {
     } else if (isLinux) {
       // Linux: Use xdotool or wmctrl for active window detection
       activeWindowFn = getActiveWindowLinux;
-    } else if (isMac) {
-      const mod = await import("active-win");
-      activeWindowFn = mod.activeWindow;
     }
   }
   return activeWindowFn();
@@ -822,9 +844,7 @@ async function checkVideoPlayback() {
       isMaximized = computeIsMaximized(windowInfo.bounds, primaryDisplay.bounds);
 
       // Always update island visibility based on current maximized state
-      if (win && !win.isDestroyed()) {
-        win.webContents.send(isMaximized ? "island-hide" : "island-show");
-      }
+      setIslandVisible(!isMaximized);
 
       // Still track state changes for debugging/logging
       if (lastMaximizedState === null || isMaximized !== lastMaximizedState) {
@@ -833,9 +853,7 @@ async function checkVideoPlayback() {
       }
     } else {
       // No window bounds available, assume not maximized and show island
-      if (win && !win.isDestroyed()) {
-        win.webContents.send("island-show");
-      }
+      setIslandVisible(true);
       if (lastMaximizedState !== false) {
         lastMaximizedState = false;
         console.log("[maximized] No window bounds, assuming not maximized");
@@ -1050,18 +1068,120 @@ function stopPlaybackStatePolling() {
   }
 }
 
-// ---------------- CREATE WINDOW ----------------四肢
+// Windows API wrappers using koffi for display affinity
+let user32 = null;
+let SetWindowDisplayAffinity = null;
+let GetWindowDisplayAffinity = null;
+
+// Constants for display affinity
+const WDA_MONITOR = 0;
+const WDA_EXCLUDEFROMCAPTURE = 1;
+const WDA_EXCLUDEFROMCAPTURE_HOTFIX = 0x11; // Alternative value for some Windows versions
+
+function initWindowsAPI() {
+  if (!isWindows) return;
+  
+  try {
+    user32 = koffi.load('user32.dll');
+    
+    // Use koffi's correct type syntax
+    SetWindowDisplayAffinity = user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'unsigned int']);
+    GetWindowDisplayAffinity = user32.func('GetWindowDisplayAffinity', 'unsigned int', ['void*']);
+    
+    console.log('[Windows API] Successfully loaded user32.dll and display affinity functions');
+  } catch (error) {
+    console.error('[Windows API] Failed to load user32.dll:', error.message);
+  }
+}
+
+function getDisplayAffinity(hwndBuffer) {
+  if (!isWindows || !GetWindowDisplayAffinity || !hwndBuffer) return null;
+  
+  try {
+    const hwnd = hwndBuffer.readUInt32LE(0);
+    const affinity = GetWindowDisplayAffinity(hwnd);
+    return affinity;
+  } catch (error) {
+    console.error('[Windows API] GetWindowDisplayAffinity failed:', error.message);
+    return null;
+  }
+}
+
+function setDisplayAffinity(hwndBuffer, affinity) {
+  if (!isWindows || !SetWindowDisplayAffinity || !hwndBuffer) return false;
+  
+  try {
+    const hwnd = hwndBuffer.readUInt32LE(0);
+    const result = SetWindowDisplayAffinity(hwnd, affinity);
+    console.log(`[Windows API] SetWindowDisplayAffinity(HWND: ${hwnd}, Affinity: ${affinity} (${getAffinityName(affinity)})) = ${result}`);
+    return result;
+  } catch (error) {
+    console.error('[Windows API] SetWindowDisplayAffinity failed:', error.message);
+    return false;
+  }
+}
+
+function getAffinityName(affinity) {
+  switch (affinity) {
+    case WDA_MONITOR: return 'WDA_MONITOR (normal)';
+    case WDA_EXCLUDEFROMCAPTURE: return 'WDA_EXCLUDEFROMCAPTURE';
+    case WDA_EXCLUDEFROMCAPTURE_HOTFIX: return 'WDA_EXCLUDEFROMCAPTURE_HOTFIX (0x11)';
+    default: return `Unknown (${affinity})`;
+  }
+}
+
+// Helper function to set window display affinity on Windows
+// This allows the window to be visible to the user but excluded from screen capture
+async function setWindowDisplayAffinity(excludeFromCapture) {
+  if (!isWindows || !win || win.isDestroyed()) return;
+
+  try {
+    // Get the native window handle (HWND)
+    const hwnd = win.getNativeWindowHandle();
+    
+    // Log current affinity before changing
+    const currentAffinity = getDisplayAffinity(hwnd);
+    console.log(`[Display Affinity] Current affinity: ${currentAffinity !== null ? getAffinityName(currentAffinity) : 'unknown'}`);
+    
+    // Set affinity using Electron's setContentProtection first
+    win.setContentProtection(excludeFromCapture);
+    console.log(`[Display Affinity] setContentProtection set to: ${excludeFromCapture}`);
+    
+    // Then try direct Windows API calls with both possible values
+    const affinityValue = excludeFromCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_MONITOR;
+    const result1 = setDisplayAffinity(hwnd, affinityValue);
+    
+    // Also try the hotfix value
+    if (excludeFromCapture) {
+      const result2 = setDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE_HOTFIX);
+    }
+    
+    // Log current affinity after changing
+    const newAffinity = getDisplayAffinity(hwnd);
+    console.log(`[Display Affinity] New affinity after changes: ${newAffinity !== null ? getAffinityName(newAffinity) : 'unknown'}`);
+    
+  } catch (error) {
+    console.error("Error setting window display affinity:", error.message);
+  }
+}
+
+// ---------------- CREATE WINDOW ----------------
 function createWindow() {
   const primary = screen.getPrimaryDisplay();
   const screenWidth = primary.bounds.width;
   const screenY = primary.bounds.y || 0;
 
-  const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
+  // Make window larger to accommodate shadow
+  const windowWidth = NOOK_WIDTH + (SHADOW_PADDING * 2);
+  const windowHeight = NOOK_HEIGHT + SHADOW_PADDING;
+
+  // Offset position to keep island visually centered
+  const x = Math.round(primary.bounds.x + (screenWidth - windowWidth) / 2);
   const y = primary.bounds.y; // Always at the very top of the screen
 
   win = new BrowserWindow({
-    width: NOOK_WIDTH,
-    height: NOOK_HEIGHT,
+    width: windowWidth,
+    height: windowHeight,
     x, y,
     frame: false,
     transparent: true,
@@ -1083,16 +1203,48 @@ function createWindow() {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   win.loadFile("index.html");
 
+  // Log window creation and apply display affinity immediately
+  console.log('[Window] BrowserWindow created, applying display affinity immediately');
+  if (isWindows) {
+    setWindowDisplayAffinity(true);
+  }
+
+  win.once('ready-to-show', () => {
+    console.log('[Window] ready-to-show event fired, re-applying display affinity');
+    if (isWindows) {
+      setWindowDisplayAffinity(true);
+    }
+  });
+
   win.webContents.on("did-finish-load", () => {
     setTimeout(() => {
       win.showInactive();
+      console.log('[Window] Window shown, re-applying display affinity');
+      // Make transparent areas click-through
+      win.setIgnoreMouseEvents(true, { forward: true });
+      // Set window to be excluded from screen capture on Windows
+      // This keeps the island visible to the user but excludes it from screenshots
+      if (isWindows) {
+        setWindowDisplayAffinity(true);
+      }
     }, 80);
   });
 
   setTimeout(() => win.setPosition(x, y), 150);
+  
+  // Log all windows periodically for debugging
+  setInterval(() => {
+    const allWindows = BrowserWindow.getAllWindows();
+    console.log(`[Window Debug] Total BrowserWindows: ${allWindows.length}`);
+    allWindows.forEach((w, index) => {
+      const hwnd = w.getNativeWindowHandle();
+      const affinity = getDisplayAffinity(hwnd);
+      console.log(`[Window Debug] Window ${index}: HWND=${hwnd.readUInt32LE(0)}, Affinity=${affinity !== null ? getAffinityName(affinity) : 'unknown'}, Visible=${w.isVisible()}`);
+    });
+  }, 5000);
 }
 
-// ---------------- IPC HANDLERS ----------------四肢
+// ---------------- IPC HANDLERS ----------------
 function setupIpcHandlers() {
   ipcMain.on("request-video-check", async () => {
     await checkVideoPlayback();
@@ -1391,11 +1543,10 @@ function setupIpcHandlers() {
     if (win && !win.isDestroyed()) {
       console.log("Hiding window - current visible state:", win.isVisible());
       try {
-        // Disable alwaysOnTop first
+        clearTimeout(hideTimer);
         win.setAlwaysOnTop(false);
-        // Small delay to ensure alwaysOnTop is disabled
-        setTimeout(() => {
-          win.hide();
+        hideTimer = setTimeout(() => {
+          if (win && !win.isDestroyed()) win.hide();
           console.log("Window hidden, new visible state:", win.isVisible());
         }, 10);
       } catch (error) {
@@ -1411,12 +1562,12 @@ function setupIpcHandlers() {
     if (win && !win.isDestroyed()) {
       console.log("Showing window");
       try {
+        clearTimeout(hideTimer);
+        hideTimer = null;
         win.showInactive();
-        // Re-enable alwaysOnTop after showing
-        setTimeout(() => {
-          win.setAlwaysOnTop(true, "screen-saver");
-          console.log("Window shown, alwaysOnTop re-enabled");
-        }, 50);
+        win.setAlwaysOnTop(true, "screen-saver");
+        win.setIgnoreMouseEvents(true, { forward: true });
+        console.log("Window shown, alwaysOnTop re-enabled");
       } catch (error) {
         console.error("Error showing window:", error);
       }
@@ -1434,33 +1585,173 @@ function setupIpcHandlers() {
   // Check if any window is maximized using active-win package
   ipcMain.handle("is-window-maximized", async () => {
     try {
-      const activeWin = await import("active-win");
-      const activeWindow = activeWin.activeWindow();
-      if (!activeWindow) return false;
-
-      const { screen } = require("electron");
+      const mod = await import("active-win");
+      const activeWindow = await mod.activeWindow();
+      if (!activeWindow?.bounds) return false;
       const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-
-      const { bounds } = activeWindow;
-      const isMaximized = computeIsMaximized(bounds, {
-        x: 0,
-        y: 0,
-        width: screenWidth,
-        height: screenHeight,
-      });
-
-      return isMaximized;
+      return computeIsMaximized(activeWindow.bounds, primaryDisplay.bounds);
     } catch (error) {
       console.error("Error checking maximized state:", error.message);
       return false;
     }
   });
 
+  // Screenshot capture
+  let recordingProcess = null;
+  let isRecording = false;
+
+  ipcMain.handle("take-screenshot", async () => {
+    try {
+      // Capture the display the island is currently on
+      const display = screen.getDisplayNearestPoint({
+        x: win.getBounds().x,
+        y: win.getBounds().y,
+      });
+
+      const { width, height } = display.size;
+      const scaleFactor = display.scaleFactor;
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: {
+          width: Math.round(width * scaleFactor),
+          height: Math.round(height * scaleFactor),
+        },
+      });
+
+      // Match the source to the right monitor
+      const source = sources.find(s => s.display_id === String(display.id)) || sources[0];
+
+      if (!source) {
+        console.error("No screen source found");
+        return false;
+      }
+
+      const png = source.thumbnail.toPNG();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const outputPath = path.join(os.homedir(), 'Downloads', `Smootie_${timestamp}.png`);
+      const outputDir = path.dirname(outputPath);
+      
+      // Ensure directory exists
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      fs.writeFileSync(outputPath, png);
+      console.log("Screenshot saved to:", outputPath);
+      
+      return true;
+    } catch (error) {
+      console.error("Error taking screenshot:", error.message);
+      return false;
+    }
+  });
+
+  // Screen recording controls
+  ipcMain.handle("start-recording", async () => {
+    console.log("[Recording] IPC start-recording received");
+    if (isRecording) {
+      console.log("[Recording] Recording already in progress");
+      return false;
+    }
+
+    try {
+      // Apply window protection for recording on Windows
+      if (isWindows) {
+        console.log("[Recording] Applying window protection for recording");
+        setWindowDisplayAffinity(true);
+      }
+      
+      isRecording = true;
+      console.log("[Recording] Recording state set to true");
+      return true;
+    } catch (error) {
+      console.error("[Recording] Error starting recording:", error.message);
+      isRecording = false;
+      return false;
+    }
+  });
+
+  ipcMain.handle("stop-recording", async () => {
+    console.log("[Recording] IPC stop-recording received");
+    if (!isRecording) {
+      console.log("[Recording] No recording in progress");
+      return false;
+    }
+
+    try {
+      isRecording = false;
+      console.log("[Recording] Recording state set to false");
+      
+      // Note: We keep window protection active since it should be permanent
+      console.log("[Recording] Window protection remains active");
+      
+      return true;
+    } catch (error) {
+      console.error("[Recording] Error stopping recording:", error.message);
+      return false;
+    }
+  });
+
+  ipcMain.handle("is-recording", async () => {
+    console.log("[Recording] IPC is-recording received, returning:", isRecording);
+    return isRecording;
+  });
+
+  // Save recorded video file
+  ipcMain.handle("save-recording", async (event, { buffer, mimeType }) => {
+    console.log("[Recording] IPC save-recording received, buffer size:", buffer.length, "mimeType:", mimeType);
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const downloadsPath = path.join(os.homedir(), 'Downloads');
+      const outputPath = path.join(downloadsPath, `Smootie_Recording_${timestamp}.webm`);
+      
+      console.log("[Recording] Saving to:", outputPath);
+      
+      // Ensure directory exists
+      if (!fs.existsSync(downloadsPath)) {
+        fs.mkdirSync(downloadsPath, { recursive: true });
+      }
+      
+      fs.writeFileSync(outputPath, Buffer.from(buffer));
+      console.log("[Recording] File saved successfully:", outputPath);
+      
+      return { success: true, path: outputPath };
+    } catch (error) {
+      console.error("[Recording] Error saving recording:", error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get desktop sources for recording
+  ipcMain.handle("get-desktop-sources", async () => {
+    console.log("[Recording] IPC get-desktop-sources received");
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 1920, height: 1080 }
+      });
+      console.log("[Recording] Got desktop sources:", sources.length);
+      // Return source info without thumbnail to reduce data transfer
+      return sources.map(source => ({
+        id: source.id,
+        name: source.name,
+        thumbnail: null // Don't send thumbnail
+      }));
+    } catch (error) {
+      console.error("[Recording] Error getting desktop sources:", error.message);
+      return [];
+    }
+  });
+
 }
 
-// ---------------- APP INIT ----------------四肢
+// ---------------- APP INIT ----------------
 app.whenReady().then(() => {
+  // Initialize Windows API for display affinity
+  if (isWindows) {
+    initWindowsAPI();
+  }
   createWindow();
   setupIpcHandlers();
   startVideoDetection();
@@ -1476,5 +1767,5 @@ app.on("activate", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });

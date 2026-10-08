@@ -9,7 +9,7 @@
     "build-linux": "electron-builder --linux",
     "package": "rmdir /s /q Smootie-win32-x64 2>nul & electron-packager . Smootie --platform=win32 --arch=x64 --out=. --overwrite --icon=icon.ico --no-asar & xcopy /e /i /y Smootie-win32-x64\\* . & rmdir /s /q Smootie-win32-x64",
     "package-linux": "electron-packager . Smootie --platform=linux --arch=x64 --out=dist-linux --overwrite",
-    "package-all": "electron-packager . Smootie --platform=all --arch=x64 --out=dist-all --overwrite",
+    "package-all": "electron-packager . Smootie --platform=win32,linux --arch=x64 --out=dist-all --overwrite",
     "dist": "npm run build"
   },
   "build": {
@@ -55,10 +55,6 @@
       "target": "AppImage",
       "icon": "icon.png",
       "category": "Utility"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "icon.icns"
     }
   },
   "devDependencies": {
@@ -68,6 +64,7 @@
   },
   "dependencies": {
     "active-win": "^9.0.0",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "koffi": "^3.3.2"
   }
 }

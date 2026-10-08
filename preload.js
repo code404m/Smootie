@@ -117,5 +117,31 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
     // Quit the app
     quitApp: () => {
         ipcRenderer.send("quit-app");
+    },
+
+    // Screenshot and recording
+    takeScreenshot: () => {
+        return ipcRenderer.invoke("take-screenshot");
+    },
+
+    startRecording: () => {
+        return ipcRenderer.invoke("start-recording");
+    },
+
+    stopRecording: () => {
+        return ipcRenderer.invoke("stop-recording");
+    },
+
+    isRecording: () => {
+        return ipcRenderer.invoke("is-recording");
+    },
+
+    saveRecording: (buffer, mimeType) => {
+        return ipcRenderer.invoke("save-recording", { buffer, mimeType });
+    },
+
+    // Get desktop sources for recording
+    getDesktopSources: () => {
+        return ipcRenderer.invoke("get-desktop-sources");
     }
 });

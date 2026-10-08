@@ -30,7 +30,7 @@
   function applyMode(mode) {
     currentMode = mode;
     debugLog("Applying mode:", mode);
-    
+
     if (clockModeEl && nookModeEl) {
       if (mode === 1) {
         clockModeEl.classList.remove("mode-hidden");
@@ -632,12 +632,243 @@
   const menuStartupToggle = document.getElementById("menu-startup-toggle");
   const homeTabBtn = document.getElementById("tab-tray");
   
-  if (menuBtn) {
-    menuBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (!menuMenu) return;
-      menuMenu.style.display = menuMenu.style.display === "block" ? "none" : "block";
-    });
+  function setupTopBarButtons() {
+    console.log("[Renderer] setupTopBarButtons called");
+    const screenshotBtn = document.getElementById("screenshot-btn");
+    const recordBtn = document.getElementById("record-btn");
+    const recordingIndicator = document.getElementById("recording-indicator");
+    
+    console.log("[Renderer] screenshotBtn:", !!screenshotBtn);
+    console.log("[Renderer] recordBtn:", !!recordBtn);
+    console.log("[Renderer] recordingIndicator:", !!recordingIndicator);
+    
+    // MediaRecorder state
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    
+    if (screenshotBtn) {
+      screenshotBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        console.log("[Renderer] Screenshot button clicked");
+        debugLog("Screenshot button clicked");
+        if (window.SmootieAPI && window.SmootieAPI.takeScreenshot) {
+          const success = await window.SmootieAPI.takeScreenshot();
+          if (success) {
+            debugLog("Screenshot captured successfully");
+          } else {
+            console.error("Failed to capture screenshot");
+          }
+        }
+      });
+    }
+
+    if (recordBtn) {
+      console.log("[Renderer] Adding click listener to record button");
+      let recordButtonBusy = false;
+      recordBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        console.log("[Renderer] Record button clicked");
+        debugLog("Record button clicked");
+        
+        if (recordButtonBusy) {
+          console.log("[Renderer] Record button busy, ignoring click");
+          debugLog("Record button busy, ignoring click");
+          return;
+        }
+        
+        try {
+          console.log("[Renderer] Checking recording state...");
+          const isRecording = await window.SmootieAPI.isRecording();
+          console.log("[Renderer] Current recording state:", isRecording);
+          debugLog("Current recording state:", isRecording);
+          
+          if (isRecording) {
+            // Stop recording
+            console.log("[Renderer] Stopping recording...");
+            debugLog("Stopping recording...");
+            recordButtonBusy = true;
+            
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+              console.log("[Renderer] Calling MediaRecorder.stop()");
+              mediaRecorder.stop();
+              debugLog("MediaRecorder.stop() called");
+            }
+            
+            const success = await window.SmootieAPI.stopRecording();
+            if (success) {
+              console.log("[Renderer] Recording stopped successfully");
+              debugLog("Recording stopped successfully");
+              if (recordingIndicator) recordingIndicator.style.display = "none";
+              recordBtn.classList.remove("is-recording");
+            } else {
+              console.error("[Renderer] Failed to stop recording in main process");
+            }
+            
+            setTimeout(() => {
+              recordButtonBusy = false;
+            }, 500);
+          } else {
+            // Start recording
+            console.log("[Renderer] Starting recording...");
+            debugLog("Starting recording...");
+            recordButtonBusy = true;
+            
+            const success = await window.SmootieAPI.startRecording();
+            if (success) {
+              console.log("[Renderer] Recording started in main process, getting display media...");
+              debugLog("Recording started in main process, getting display media...");
+              
+              try {
+                // Get desktop sources from main process
+                console.log("[Renderer] Getting desktop sources from main process...");
+                const sources = await window.SmootieAPI.getDesktopSources();
+                console.log("[Renderer] Got desktop sources:", sources.length);
+                
+                if (sources.length === 0) {
+                  throw new Error("No desktop sources available");
+                }
+                
+                // Use the first source (primary screen)
+                const primarySource = sources[0];
+                console.log("[Renderer] Using source:", primarySource.name, "id:", primarySource.id);
+                
+                // Get the stream using getUserMedia with chromeMediaSource
+                console.log("[Renderer] Calling getUserMedia with chromeMediaSource...");
+                const stream = await navigator.mediaDevices.getUserMedia({
+                  audio: false,
+                  video: {
+                    mandatory: {
+                      chromeMediaSource: 'desktop',
+                      chromeMediaSourceId: primarySource.id,
+                      minWidth: 1920,
+                      maxWidth: 1920,
+                      minHeight: 1080,
+                      maxHeight: 1080
+                    }
+                  }
+                });
+                console.log("[Renderer] Got media stream from getUserMedia");
+                debugLog("Got media stream from getUserMedia");
+                
+                // Determine supported MIME types
+                const mimeTypes = [
+                  'video/webm;codecs=vp9',
+                  'video/webm;codecs=vp8',
+                  'video/webm'
+                ];
+                
+                let selectedMimeType = null;
+                for (const mimeType of mimeTypes) {
+                  if (MediaRecorder.isTypeSupported(mimeType)) {
+                    selectedMimeType = mimeType;
+                    console.log("[Renderer] Supported MIME type:", mimeType);
+                    debugLog("Supported MIME type:", mimeType);
+                    break;
+                  }
+                }
+                
+                if (!selectedMimeType) {
+                  throw new Error("No supported video MIME type found");
+                }
+                
+                // Create MediaRecorder
+                const options = { mimeType: selectedMimeType };
+                mediaRecorder = new MediaRecorder(stream, options);
+                console.log("[Renderer] MediaRecorder created with", selectedMimeType);
+                debugLog("MediaRecorder created with", selectedMimeType);
+                
+                recordedChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                  console.log("[Renderer] MediaRecorder data available, chunk size:", event.data.size);
+                  debugLog("MediaRecorder data available, chunk size:", event.data.size);
+                  if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                  }
+                };
+                
+                mediaRecorder.onstop = async () => {
+                  console.log("[Renderer] MediaRecorder stopped, total chunks:", recordedChunks.length);
+                  debugLog("MediaRecorder stopped, total chunks:", recordedChunks.length);
+                  
+                  try {
+                    const blob = new Blob(recordedChunks, { type: selectedMimeType });
+                    console.log("[Renderer] Blob created, size:", blob.size);
+                    debugLog("Blob created, size:", blob.size);
+                    
+                    // Convert blob to array buffer
+                    const arrayBuffer = await blob.arrayBuffer();
+                    console.log("[Renderer] ArrayBuffer created, size:", arrayBuffer.byteLength);
+                    debugLog("ArrayBuffer created, size:", arrayBuffer.byteLength);
+                    
+                    // Send to main process for saving
+                    const result = await window.SmootieAPI.saveRecording(
+                      Array.from(new Uint8Array(arrayBuffer)),
+                      selectedMimeType
+                    );
+                    
+                    if (result.success) {
+                      console.log("[Renderer] Recording saved successfully to:", result.path);
+                      debugLog("Recording saved successfully to:", result.path);
+                      alert(`Recording saved to: ${result.path}`);
+                    } else {
+                      console.error("[Renderer] Failed to save recording:", result.error);
+                      alert(`Failed to save recording: ${result.error}`);
+                    }
+                  } catch (error) {
+                    console.error("[Renderer] Error processing recording:", error);
+                    alert(`Error processing recording: ${error.message}`);
+                  }
+                  
+                  // Stop all tracks
+                  stream.getTracks().forEach(track => track.stop());
+                  console.log("[Renderer] Media tracks stopped");
+                  debugLog("Media tracks stopped");
+                };
+                
+                mediaRecorder.start(1000); // Collect data every second
+                console.log("[Renderer] MediaRecorder started");
+                debugLog("MediaRecorder started");
+                
+                if (recordingIndicator) recordingIndicator.style.display = "block";
+                recordBtn.classList.add("is-recording");
+                console.log("[Renderer] Recording UI updated");
+                debugLog("Recording UI updated");
+                
+              } catch (mediaError) {
+                console.error("[Renderer] Error getting display media:", mediaError);
+                debugLog("Error getting display media:", mediaError.message);
+                alert(`Failed to start recording: ${mediaError.message}`);
+                
+                // Roll back the recording state
+                await window.SmootieAPI.stopRecording();
+              }
+              
+            } else {
+              console.error("[Renderer] Failed to start recording in main process");
+              alert("Failed to start recording");
+            }
+            
+            setTimeout(() => {
+              recordButtonBusy = false;
+            }, 500);
+          }
+        } catch (error) {
+          console.error("[Renderer] Error in record button handler:", error);
+          debugLog("Error in record button handler:", error.message);
+          recordButtonBusy = false;
+        }
+      });
+    } else {
+      console.log("[Renderer] Record button not found in DOM");
+    }
+  }
+  
+  // Setup top bar buttons after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupTopBarButtons, { once: true });
+  } else {
+    setupTopBarButtons();
   }
 
   if (menuMenu) {
@@ -838,17 +1069,16 @@
 
     // Debounce visibility changes to prevent flickering
     visibilityTimeout = setTimeout(() => {
-      const nookTray = document.getElementById("mode-nook");
-      const clockMode = document.getElementById("mode-clock");
-      
-      if (nookTray && clockMode) {
+      const windowContainer = document.querySelector(".window-container");
+
+      if (windowContainer) {
         if (isWindowMaximized) {
-          nookTray.style.display = "none";
-          clockMode.style.display = "none";
+          windowContainer.style.visibility = "hidden";
+          windowContainer.style.opacity = "0";
           debugLog("Island hidden: window maximized");
         } else {
-          nookTray.style.display = "flex";
-          clockMode.style.display = "flex";
+          windowContainer.style.visibility = "visible";
+          windowContainer.style.opacity = "1";
           debugLog("Island shown: window not maximized");
         }
       }

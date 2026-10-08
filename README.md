@@ -1,20 +1,20 @@
-# Smootie - Cross-Platform Desktop Widget
+# Smootie - Desktop Widget
 
 A beautiful desktop widget that displays time, date, and YouTube video information with media controls.
 
 ## 🌍 Platform Support
 
-✅ **Windows** - Full support with PowerShell integration  
-✅ **Linux** - Full support including Kali Linux, Ubuntu, Fedora, Debian, Arch, etc.  
-✅ **macOS** - Full support  
+- ✅ **Windows 10 (build 19041+) / 11**: Full support, including screenshot exclusion
+- 🟡 **Linux (X11)**: Works, tested on Kali; other distros not fully tested
+- ⚠️ **Linux (Wayland)**: Limited; window management tools (`xdotool`, `wmctrl`) may not work
 
 ## 📦 Installation
 
 ### Windows
 1. Download from here: https://www.dropbox.com/home/Smootie
-2. Run Smootie.exe.
+2. Run Smootie.exe
 
-### Linux (including Kali Linux)
+### Linux (tested on Kali)
 1. Download `Smootie-linux-x64.tar.gz`
 2. Extract: `tar -xzf Smootie-linux-x64.tar.gz`
 3. Run: `./Smootie`
@@ -35,25 +35,31 @@ sudo pacman -S xdotool wmctrl
 sudo zypper install xdotool wmctrl
 ```
 
-### macOS
-1. Download from here: [https://www.dropbox.com/home/Smootie](https://www.dropbox.com/scl/fo/dl4yksdk5963yryi86uot/AHj1LXsoaBKTtpVPDzFRrxo?rlkey=4ls1bv310it2nowbn5h9dimr1&st=h7olzyh7&dl=0)
-2. Run `Smootie.exe`
-
 ## 🚀 Features
 
 - **Clock Mode**: Minimal clock display with date
 - **Widget Mode**: Full widget with YouTube video info and controls
+- **Mode 2**: Extended widget with screenshot functionality
 - **Media Controls**: Play/pause, next, previous for YouTube
+- **Screenshot**: Full-screen capture with island exclusion (Windows only)
 - **Auto-start**: Option to start with your system
-- **Cross-platform**: Works on Windows, Linux, and macOS
 - **Kali Linux Compatible**: Tested and working on Kali Linux
 
 ## 🎮 Controls
 
-- **Spacebar**: Switch between modes
-- **Click clock**: Switch to widget mode
-- **Double-click background**: Switch to clock mode
+- **Spacebar**: Switch between Clock Mode, Widget Mode, and Mode 2
+- **Click clock**: Switch to Widget Mode
+- **Double-click background**: Switch to Clock Mode
+- **Screenshot button** (Mode 2): Capture full screen at native resolution
 - **Right-click**: Close app
+
+## 📸 Screenshot Feature
+
+The Screenshot button in Mode 2 captures the full screen at native resolution.
+
+**Windows**: The island stays visible on screen but is excluded from the screenshot using `SetWindowDisplayAffinity` with `WDA_EXCLUDEFROMCAPTURE`.
+
+**Linux**: The screenshot includes the island in the capture (no exclusion mechanism available).
 
 ## 🔧 Building from Source
 
@@ -70,7 +76,6 @@ npm run package-all
 # Build for specific platform
 npm run package        # Windows
 npm run package-linux  # Linux
-npm run package-mac    # macOS
 ```
 
 ## 🐧 Linux Specific Notes
@@ -78,7 +83,7 @@ npm run package-mac    # macOS
 ### Kali Linux
 - Fully compatible with Kali Linux
 - Uses `xdotool` and `wmctrl` for window management
-- Supports all desktop environments (GNOME, KDE, XFCE, etc.)
+- Tested on X11 desktop environments
 
 ### Troubleshooting Linux
 If media controls don't work:
@@ -96,9 +101,8 @@ The app creates a `.desktop` file in `~/.config/autostart/` for automatic startu
 
 ## 📱 System Requirements
 
-- **Windows**: Windows 10/11
+- **Windows**: Windows 10 (build 19041+) / 11
 - **Linux**: Any modern distribution with X11
-- **macOS**: macOS 10.14+
 - **RAM**: 100MB minimum
 - **Storage**: 200MB
 
