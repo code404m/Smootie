@@ -1,41 +1,21 @@
-/* Nook Tray Island Widget - Premium UI Update */
+/* Nook Tray Island Widget - Exact Match to Photo */
 
 html, body {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
   background: transparent !important;
 }
 
-/* Container to provide space for shadow rendering */
-.window-container {
-  width: 100%;
-  height: 100%;
-  padding: 0 60px 60px 60px; /* Space for shadow on left, right, bottom */
-  box-sizing: border-box;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  position: relative;
-  pointer-events: none; /* Allow click-through in padding areas */
-}
-
-/* Re-enable pointer events for the actual island */
-.window-container > * {
-  pointer-events: auto;
-}
-
-/* Hide helper */
-.mode-hidden {
-  display: none !important;
-}
-
 /* Shared Modes */
 .nook-tray {
-  position: relative;
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   width: 100%;
   max-width: 660px;
   height: calc(100% - 7px);
@@ -43,22 +23,16 @@ html, body {
   border-radius: 0 0 33px 33px;
   padding: 8px 16px;
   padding-top: 3px;
-  display: flex;
+  display: none;
   flex-direction: column;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.35),
-    0 20px 60px rgba(0, 0, 0, 0.25),
-    15px 0 40px rgba(0, 0, 0, 0.20),
-    -15px 0 40px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(30px) saturate(200%);
-  backdrop-filter: blur(30px) saturate(200%);
+  border: none;
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
   overflow: visible;
   z-index: 9999 !important;
   opacity: 1;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s ease-out;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
@@ -72,8 +46,8 @@ html, body {
 
 /* Mode 1: Clock Only (Dynamic Island) */
 .clock-mode {
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -86,11 +60,14 @@ html, body {
   position: relative;
   overflow: visible;
   opacity: 1;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
 .clock-island {
-  position: relative;
+  position: fixed !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
   width: auto;
   min-width: 220px;
   background: #000000;
@@ -102,16 +79,12 @@ html, body {
   box-sizing: border-box;
   z-index: 9999 !important;
   opacity: 1;
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s ease-out;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
   -webkit-app-region: no-drag !important;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.35),
-    0 16px 48px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .clock-inner {
@@ -353,7 +326,7 @@ html, body {
   width: 85px;
   height: 85px;
   border-radius: 25px;
-  background: #000000;
+  background: #222;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -362,10 +335,6 @@ html, body {
   position: relative;
   margin-left: 0px; /* Moved 2px to the left */
   margin-top: -5px;
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .album-badge {
@@ -706,7 +675,7 @@ html, body {
   height: 90px;
   border-radius: 50%; /* Make it a circle */
   overflow: hidden;
-  background: #000000;
+  background: #222;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -714,18 +683,6 @@ html, body {
   position: relative;
   margin-right: -3px; /* Moved 2px to the left */
   margin-top: -5px;
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.profile-picture:hover {
-  transform: scale(1.05);
-  box-shadow: 
-    0 6px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .profile-picture img {

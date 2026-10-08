@@ -8,7 +8,7 @@
   let lastGoodThumbnailUrl = null;
   let lastVideoDetectedAt = 0;
   let lastVideoCheckRequestAt = 0;
-  const DEFAULT_ALBUM_ART = "smootie album .jpeg";
+  const DEFAULT_ALBUM_ART = "album-art.png";
   const VIDEO_INFO_GRACE_MS = 4000;
   const VIDEO_CHECK_COOLDOWN_MS = 500;
 
@@ -999,13 +999,15 @@
           profileImg.style.display = "block";
           debugLog("Image src set to:", profileImg.src);
         } else {
-          // No photo found - hide image to show dark background
-          profileImg.style.display = "none";
-          debugLog("No photo found, hiding image");
+          // No photo found - show placeholder
+          profileImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E";
+          profileImg.style.display = "block";
+          debugLog("No photo found, showing placeholder");
         }
       }).catch((error) => {
-        // Error - hide image to show dark background
-        profileImg.style.display = "none";
+        // Error - show placeholder
+        profileImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E";
+        profileImg.style.display = "block";
         debugLog("Could not load random photo:", error);
       });
     } else {
@@ -1069,16 +1071,17 @@
 
     // Debounce visibility changes to prevent flickering
     visibilityTimeout = setTimeout(() => {
-      const windowContainer = document.querySelector(".window-container");
-
-      if (windowContainer) {
+      const nookTray = document.getElementById("mode-nook");
+      const clockMode = document.getElementById("mode-clock");
+      
+      if (nookTray && clockMode) {
         if (isWindowMaximized) {
-          windowContainer.style.visibility = "hidden";
-          windowContainer.style.opacity = "0";
+          nookTray.style.display = "none";
+          clockMode.style.display = "none";
           debugLog("Island hidden: window maximized");
         } else {
-          windowContainer.style.visibility = "visible";
-          windowContainer.style.opacity = "1";
+          nookTray.style.display = "flex";
+          clockMode.style.display = "flex";
           debugLog("Island shown: window not maximized");
         }
       }
