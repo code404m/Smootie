@@ -84,61 +84,61 @@
     }
   });
 
-  // Click on black background to switch to Mode 1 (but not on interactive elements)
-  document.addEventListener("click", (e) => {
-    // Only switch to Mode 1 if we're currently in Mode 2 (nook mode)
-    if (currentMode !== 2) return;
-    
-    // Check if the clicked element or its parents are interactive
-    const target = e.target;
-    const interactiveSelectors = [
-      'button', 
-      '.music-control-btn', 
-      '.top-icon', 
-      '.nook-tab',
-      '.menu-item',
-      'input',
-      'select',
-      'textarea',
-      'a',
-      '[role="button"]',
-      '.clickable',
-      '.svg-icon',
-      '.tab-icon',
-      'svg',
-      'path',
-      '.nook-label',
-      '.tray-label',
-      '.song-title',
-      '.album-label',
-      '.artist-name',
-      '.clock-time',
-      '.clock-date'
-    ];
-    
-    // Check if the clicked element or any of its parents match interactive selectors
-    let isInteractive = false;
-    let element = target;
-    while (element && element !== document.body) {
-      if (interactiveSelectors.some(selector => element.matches?.(selector))) {
-        isInteractive = true;
-        break;
-      }
-      element = element.parentElement;
-    }
-    
-    // Only switch to Mode 1 if the click was on a non-interactive element
-    if (!isInteractive) {
-      // Check if we're clicking on the actual background (black areas)
-      const computedStyle = window.getComputedStyle(target);
-      const backgroundColor = computedStyle.backgroundColor;
-      
-      // Switch to Mode 1 if clicking on black/dark background
-      if (backgroundColor && (backgroundColor === 'rgb(0, 0, 0)' || backgroundColor === '#000000' || backgroundColor.includes('rgb(0, 0, 0)'))) {
-        applyMode(1);
-      }
-    }
-  });
+  // DISABLED: Click on black background to switch to Mode 1 (was causing accidental mode switches)
+  // document.addEventListener("click", (e) => {
+  //   // Only switch to Mode 1 if we're currently in Mode 2 (nook mode)
+  //   if (currentMode !== 2) return;
+  //   
+  //   // Check if the clicked element or its parents are interactive
+  //   const target = e.target;
+  //   const interactiveSelectors = [
+  //     'button', 
+  //     '.music-control-btn', 
+  //     '.top-icon', 
+  //     '.nook-tab',
+  //     '.menu-item',
+  //     'input',
+  //     'select',
+  //     'textarea',
+  //     'a',
+  //     '[role="button"]',
+  //     '.clickable',
+  //     '.svg-icon',
+  //     '.tab-icon',
+  //     'svg',
+  //     'path',
+  //     '.nook-label',
+  //     '.tray-label',
+  //     '.song-title',
+  //     '.album-label',
+  //     '.artist-name',
+  //     '.clock-time',
+  //     '.clock-date'
+  //   ];
+  //   
+  //   // Check if the clicked element or any of its parents match interactive selectors
+  //   let isInteractive = false;
+  //   let element = target;
+  //   while (element && element !== document.body) {
+  //     if (interactiveSelectors.some(selector => element.matches?.(selector))) {
+  //       isInteractive = true;
+  //       break;
+  //     }
+  //     element = element.parentElement;
+  //   }
+  //   
+  //   // Only switch to Mode 1 if the click was on a non-interactive element
+  //   if (!isInteractive) {
+  //     // Check if we're clicking on the actual background (black areas)
+  //     const computedStyle = window.getComputedStyle(target);
+  //     const backgroundColor = computedStyle.backgroundColor;
+  //     
+  //     // Switch to Mode 1 if clicking on black/dark background
+  //     if (backgroundColor && (backgroundColor === 'rgb(0, 0, 0)' || backgroundColor === '#000000' || backgroundColor.includes('rgb(0, 0, 0)'))) {
+  //       applyMode(1);
+  //     }
+  //   }
+  // });
 
   // Multiple switching options
   window.addEventListener("keydown", (e) => {
@@ -918,12 +918,13 @@
     });
   }
 
-  if (homeTabBtn) {
-    homeTabBtn.addEventListener("click", () => {
-      debugLog("Home tab clicked, returning to Mode 1");
-      applyMode(1); // Always switch to Mode 1 (clock)
-    });
-  }
+  // DISABLED: Home tab auto-switch to Mode 1 (was causing accidental mode switches)
+  // if (homeTabBtn) {
+  //   homeTabBtn.addEventListener("click", () => {
+  //     debugLog("Home tab clicked, returning to Mode 1");
+  //     applyMode(1); // Always switch to Mode 1 (clock)
+  //   });
+  // }
 
   // Close settings menu when clicking outside
   document.addEventListener("click", () => {
@@ -934,15 +935,16 @@
 
   // Click on nook-tray background to return to mode 1 (clock)
   const nookTray = document.getElementById("mode-nook");
-  if (nookTray) {
-    nookTray.addEventListener("click", (e) => {
-      // Only switch to mode 1 if clicking on the background, not interactive elements
-      if (e.target === nookTray || e.target.classList.contains("nook-content")) {
-        debugLog("Background clicked, returning to Mode 1");
-        applyMode(1); // Switch to clock mode
-      }
-    });
-  }
+  // DISABLED: Background click auto-switch to Mode 1 (was causing accidental mode switches)
+  // if (nookTray) {
+  //   nookTray.addEventListener("click", (e) => {
+  //     // Only switch to mode 1 if clicking on the background, not interactive elements
+  //     if (e.target === nookTray || e.target.classList.contains("nook-content")) {
+  //       debugLog("Background clicked, returning to Mode 1");
+  //       applyMode(1); // Switch to clock mode
+  //     }
+  //   });
+  // }
 
   // Listen for video info updates from main process
   if (window.SmootieAPI) {
@@ -955,6 +957,19 @@
   if (window.SmootieAPI) {
     window.SmootieAPI.onPlaybackStateUpdate((state) => {
       updatePlaybackState(state);
+    });
+  }
+
+  // Listen for island show/hide events from main process
+  if (window.SmootieAPI) {
+    window.SmootieAPI.onIslandShow(() => {
+      debugLog("Received island-show event from main process");
+      // Island is being shown - preserve current mode
+    });
+
+    window.SmootieAPI.onIslandHide(() => {
+      debugLog("Received island-hide event from main process");
+      // Island is being hidden - preserve current mode for when it shows again
     });
   }
 
@@ -1060,6 +1075,8 @@
   loadRandomPhoto();
 
   // -------- WINDOW MAXIMIZATION DETECTION --------
+  // DISABLED: Island now always stays visible regardless of maximization state
+  /*
   let isWindowMaximized = false;
 
   // Update island visibility based on maximization state with debouncing
@@ -1123,4 +1140,5 @@
       });
     }
   }
+  */
 })();

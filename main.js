@@ -56,17 +56,23 @@ function setIslandVisible(visible) {
   lastIslandVisible = visible;
   
   if (win && !win.isDestroyed()) {
-    win.webContents.send(visible ? "island-show" : "island-hide");
-    
-    // When showing the island, ensure it's centered
+    // Actually show/hide the window
     if (visible) {
+      win.show();
+      // Ensure it's centered when showing
       const primary = screen.getPrimaryDisplay();
       const screenWidth = primary.bounds.width;
       const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
       const y = primary.bounds.y;
       win.setPosition(x, y);
-      console.log(`[Window] Repositioned to center: x=${x}, y=${y}`);
+      console.log(`[Window] Window shown and repositioned to center: x=${x}, y=${y}`);
+    } else {
+      win.hide();
+      console.log("[Window] Window hidden");
     }
+    
+    // Also send IPC message for renderer (in case it needs to know)
+    win.webContents.send(visible ? "island-show" : "island-hide");
   }
 }
 
@@ -90,11 +96,15 @@ let playbackCheckMs = 0;
 const PLAYBACK_CHECK_INTERVAL_MS = 1200;
 let lastMediaCommandAtMs = 0;
 const MEDIA_COMMAND_COOLDOWN_MS = 350;
-const IS_DEVELOPMENT = !app.isPackaged;
+let IS_DEVELOPMENT = null;
 
 function getStartupEnabled() {
   try {
     if (isWindows) {
+      if (!app.isReady()) {
+        console.log("[startup] App not ready yet, returning false");
+        return false;
+      }
       const settings = app.getLoginItemSettings();
       const enabled = !!settings?.openAtLogin;
       console.log("[startup] Current login settings:", settings);
@@ -940,25 +950,42 @@ async function checkVideoPlayback() {
     const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
     const title = (windowInfo?.title || "").toLowerCase();
     const isScreenpressoActive = ownerName.includes('screenpresso') || title.includes('screenpresso');
+    
+    // Debug logging to see what's detected
+    console.log("[Window Detection] ownerName:", ownerName, "title:", title, "isScreenpressoActive:", isScreenpressoActive);
 
-    // Fullscreen detection - but keep island visible if Screenpresso is active
+    // DISABLED: Fullscreen hiding logic causing issues
+    // Window will now always stay visible to ensure screenshots work properly
+    // If you want to re-enable fullscreen hiding, uncomment the code below
+    
+    /*
+    // If Screenpresso is active, ALWAYS show the island and skip fullscreen logic completely
+    if (isScreenpressoActive) {
+      if (lastMaximizedState !== true) {
+        lastMaximizedState = true;
+        console.log("[Screenpresso] Active - forcing island to show for screenshots");
+        setIslandVisible(true);
+      }
+      return; // Skip all other logic when Screenpresso is active
+    }
+
+    // Normal fullscreen detection (only when Screenpresso is NOT active)
     const timeSinceStartup = Date.now() - appStartupTime;
     if (timeSinceStartup > 3000) {
       const isAnyFullscreen = await isAnyWindowFullscreen();
       
-      // Hide island if fullscreen AND Screenpresso is NOT active
-      const shouldHide = isAnyFullscreen && !isScreenpressoActive;
+      const shouldShow = !isAnyFullscreen;
       
-      if (lastMaximizedState === null || shouldHide !== lastMaximizedState) {
-        lastMaximizedState = shouldHide;
-        console.log("[fullscreen] State changed to:", shouldHide, isScreenpressoActive ? "(Screenpresso active - showing island)" : "");
-        setIslandVisible(!shouldHide);
+      if (lastMaximizedState === null || shouldShow !== lastMaximizedState) {
+        lastMaximizedState = shouldShow;
+        console.log("[fullscreen] State changed to:", shouldShow ? "SHOW" : "HIDE");
+        setIslandVisible(shouldShow);
       }
     }
+    */
     
     // Check if it's a browser window (has URL) or known browser
-    const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
-    const title = (windowInfo?.title || "").toLowerCase();
+    // ownerName and title are already declared above (line 940-941)
     const url = (windowInfo?.url || "").toLowerCase();
     
     // Any window with a URL is likely a browser, plus check known browsers
