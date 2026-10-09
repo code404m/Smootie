@@ -41,6 +41,18 @@
                 </button>
             </div>
             <div class="top-bar-icons">
+                <button class="top-icon" id="screenshot-btn" aria-label="Screenshot">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" fill="none" stroke="white" stroke-width="2"/>
+                        <circle cx="12" cy="13" r="4" fill="none" stroke="white" stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="top-icon" id="record-btn" aria-label="Record Screen">
+                    <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="6" fill="white"/>
+                    </svg>
+                    <span class="recording-indicator" id="recording-indicator" style="display: none;"></span>
+                </button>
                 <button class="top-icon" id="menu-btn" aria-label="Menu">
                     <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="6" cy="6" r="2" fill="white" />
@@ -68,7 +80,7 @@
             <div class="nook-music">
                 <div class="music-content">
                     <div class="album-art" id="album-art">
-                        <img src="" alt="" id="album-art-img" style="display: none;">
+                        <img src="album-art.png" alt="" id="album-art-img" style="display: block;">
                         <div class="album-badge" aria-hidden="true">
                             <svg class="svg-icon" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7L8 5Z" />
@@ -136,7 +148,7 @@
             <!-- Right Section: Profile -->
             <div class="nook-profile">
                 <div class="profile-picture" id="profile-picture" style="cursor: pointer;">
-                    <img src="" alt="Profile" id="profile-img" style="display: none;">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E" alt="Profile" id="profile-img" style="display: block;">
                 </div>
             </div>
         </div>

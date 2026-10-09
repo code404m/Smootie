@@ -42,16 +42,31 @@
         clockModeEl.classList.add("mode-hidden");
         nookModeEl.classList.remove("mode-hidden");
         debugLog("Switched to Mode 2 (Nook)");
+        debugLog("Current video info cached:", currentVideoInfo ? currentVideoInfo.title : "none");
 
-        // Always trigger a fresh video detection when entering Mode 2
-        if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
-          window.SmootieAPI.requestVideoCheck();
+        // Update video info immediately if we have it cached
+        if (currentVideoInfo) {
+          debugLog("Updating video info for Mode 2 from cache:", currentVideoInfo.title);
+          updateVideoInfoImmediate(currentVideoInfo);
+        } else {
+          debugLog("No cached video info, requesting fresh check");
         }
 
-        // Update video info immediately if we have it
-        if (currentVideoInfo) {
-          debugLog("Updating video info for Mode 2:", currentVideoInfo.title);
-          updateVideoInfo(currentVideoInfo);
+        // Always trigger a fresh video detection when entering Mode 2 (with slight delay)
+        // Request multiple times to ensure detection
+        if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (1)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 100);
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (2)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 300);
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (3)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 600);
         }
       }
     } else {
@@ -179,6 +194,9 @@
           const interactiveSelectors = [
             'button',
             '.music-control-btn',
+            '#play-btn',
+            '#prev-btn',
+            '#next-btn',
             '.album-art',
             '.profile-picture',
             '.calendar-events-icon',
@@ -195,6 +213,7 @@
           while (element && element !== nookContent) {
             if (interactiveSelectors.some(selector => element.matches?.(selector))) {
               isInteractive = true;
+              console.log("[Nook Click] Click on interactive element detected:", element);
               break;
             }
             element = element.parentElement;
@@ -317,7 +336,8 @@
   function updateVideoInfoImmediate(videoInfo) {
     const incomingVideo = videoInfo && videoInfo.title && videoInfo.title !== "No video playing";
     debugLog('Received video info:', JSON.stringify(videoInfo, null, 2));
-    
+    debugLog('Current mode:', currentMode);
+
     const songTitleEl = document.getElementById("song-title");
     const albumLabelEl = document.getElementById("album-label");
     const artistNameEl = document.getElementById("artist-name");
@@ -336,14 +356,32 @@
         }
       }
       lastGoodThumbnailUrl = null;
+      // Reset to paused state when no video
+      logicalPlaybackState = 'paused';
+      updatePlaybackState('paused');
       return;
     }
 
     // Store new video info (playback state comes from main process SMTC updates)
     currentVideoInfo = videoInfo;
     lastVideoDetectedAt = Date.now();
+    debugLog('Stored video info in currentVideoInfo:', currentVideoInfo.title);
 
-    if (shouldShowVideoInfo()) {
+    // When YouTube video is detected, assume it's playing (YouTube auto-plays)
+    // This shows the PAUSE button which is correct for auto-playing videos
+    // Do this regardless of current mode
+    if (videoInfo.source === "youtube") {
+      logicalPlaybackState = 'playing';
+      updatePlaybackState('playing');
+      debugLog('Set playback state to playing for YouTube video (mode:', currentMode, ')');
+    }
+
+    // Show video info if we're in Mode 2 OR if video is recently detected
+    // In Mode 2, always show cached info (no grace period check)
+    // In Mode 1, only show if recently detected (within grace period)
+    const shouldShow = currentMode === 2 ? true : shouldShowVideoInfo();
+
+    if (currentVideoInfo && shouldShow) {
       const displayInfo = currentVideoInfo;
       if (!displayInfo) {
         // Nothing stored yet, fall back to default art
@@ -353,7 +391,7 @@
         }
         return;
       }
-      debugLog('Showing video info:', displayInfo.title);
+      debugLog('Showing video info:', displayInfo.title, 'in mode:', currentMode, 'shouldShow:', shouldShow);
       // Show video info when YouTube video is detected
       if (songTitleEl) {
         songTitleEl.textContent = displayInfo.title;
@@ -540,10 +578,11 @@
   }
 
   function setupMusicControls() {
-    if (controlsInitialized) {
-      debugLog("Music controls already initialized");
-      return;
-    }
+    // Remove the initialized check to allow re-initialization for debugging
+    // if (controlsInitialized) {
+    //   debugLog("Music controls already initialized");
+    //   return;
+    // }
 
     playBtn = document.getElementById("play-btn");
     prevBtn = document.getElementById("prev-btn");
@@ -564,14 +603,19 @@
     }
 
     if (playBtn) {
-      // Default to playing state (show Pause icon) to match YouTube's behavior
+      // Default to playing state (show Pause icon) - assume video might be playing
       logicalPlaybackState = 'playing';
       updatePlaybackState(logicalPlaybackState);
+
+      // Remove any existing event listeners by cloning
+      const newPlayBtn = playBtn.cloneNode(true);
+      playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+      playBtn = newPlayBtn;
 
       playBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        console.log("[Music Controls] Play button clicked");
+        console.log("[Music Controls] Play button clicked - ACTUAL CLICK DETECTED");
         debugLog("Play button clicked");
         
         if (playToggleInFlight) {
@@ -580,7 +624,6 @@
           return;
         }
         playToggleInFlight = true;
-        playBtn.classList.add("is-busy");
 
         // Optimistically flip UI so the user sees immediate feedback
         const nextState = logicalPlaybackState === 'playing' ? 'paused' : 'playing';
@@ -602,25 +645,25 @@
 
         setTimeout(() => {
           playToggleInFlight = false;
-          playBtn.classList.remove("is-busy");
         }, 450);
       });
+      
+      console.log("[Music Controls] Play button event listener attached successfully");
     } else {
       console.error("[Music Controls] Play button not found in DOM");
     }
 
     if (prevBtn) {
+      // Remove any existing event listeners by cloning
+      const newPrevBtn = prevBtn.cloneNode(true);
+      prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+      prevBtn = newPrevBtn;
+
       prevBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        console.log("[Music Controls] Previous button clicked");
+        console.log("[Music Controls] Previous button clicked - ACTUAL CLICK DETECTED");
         debugLog("Previous button clicked");
-        
-        // Visual feedback
-        prevBtn.style.opacity = '0.5';
-        setTimeout(() => {
-          prevBtn.style.opacity = '';
-        }, 200);
         
         // Send previous command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPrevious) {
@@ -632,22 +675,23 @@
           console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+      
+      console.log("[Music Controls] Previous button event listener attached successfully");
     } else {
       console.error("[Music Controls] Previous button not found in DOM");
     }
 
     if (nextBtn) {
+      // Remove any existing event listeners by cloning
+      const newNextBtn = nextBtn.cloneNode(true);
+      nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+      nextBtn = newNextBtn;
+
       nextBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        console.log("[Music Controls] Next button clicked");
+        console.log("[Music Controls] Next button clicked - ACTUAL CLICK DETECTED");
         debugLog("Next button clicked");
-        
-        // Visual feedback
-        nextBtn.style.opacity = '0.5';
-        setTimeout(() => {
-          nextBtn.style.opacity = '';
-        }, 200);
         
         // Send next command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoNext) {
@@ -659,6 +703,8 @@
           console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+      
+      console.log("[Music Controls] Next button event listener attached successfully");
     } else {
       console.error("[Music Controls] Next button not found in DOM");
     }
@@ -667,10 +713,38 @@
   }
 
   // Ensure control listeners are attached after DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupMusicControls, { once: true });
-  } else {
+  // Use a more robust approach with multiple retries
+  function initializeControlsWithRetry() {
+    console.log("[Music Controls] Initializing controls with retry");
     setupMusicControls();
+    
+    // Retry a few times to ensure buttons are found
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryInterval = setInterval(() => {
+      retryCount++;
+      if (retryCount >= maxRetries) {
+        clearInterval(retryInterval);
+        console.log("[Music Controls] Max retries reached");
+        return;
+      }
+      
+      const playCheck = document.getElementById("play-btn");
+      const prevCheck = document.getElementById("prev-btn");
+      const nextCheck = document.getElementById("next-btn");
+      
+      if (playCheck || prevCheck || nextCheck) {
+        console.log("[Music Controls] Found buttons on retry", retryCount);
+        setupMusicControls();
+        clearInterval(retryInterval);
+      }
+    }, 100);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeControlsWithRetry, { once: true });
+  } else {
+    initializeControlsWithRetry();
   }
 
   // Top bar buttons (will be initialized after DOM is ready)

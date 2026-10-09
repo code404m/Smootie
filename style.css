@@ -418,7 +418,8 @@ html, body {
   display: flex;
   align-items: center;
   gap: 1px;
-  z-index: 2;
+  z-index: 100;
+  pointer-events: auto !important;
 }
 
 
@@ -463,6 +464,11 @@ html, body {
 
 .music-control-btn.play-btn.is-paused .icon-pause {
   display: none;
+}
+
+.music-control-btn.play-btn.is-busy {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .music-control-btn.play-btn .icon-play .svg-icon path {

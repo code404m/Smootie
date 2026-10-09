@@ -430,71 +430,144 @@ function activateYouTubeAndSendKey(youtubeWindowTitle, youtubeProcessId, key) {
   const pid = Number.isFinite(Number(youtubeProcessId)) ? Number(youtubeProcessId) : null;
 
   if (isWindows) {
-    // Build a minimal, safe PowerShell script: try AppActivate by PID, then by title, then by generic 'YouTube'
-    const pidActivation = pid !== null
-      ? `
-        try { $activated = $shell.AppActivate(${pid}) } catch { $activated = $false }
-      `
-      : `
-        $activated = $false
-      `;
+    // Use Windows API to find and activate window by process ID (more reliable than AppActivate)
+    const ps = `Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
 
-    const titleActivation = escapedTitle
-      ? `
-        if (-not $activated -and '${escapedTitle}'.Length -gt 0) {
-          try { $activated = $shell.AppActivate('${escapedTitle}') } catch { }
-        }
-      `
-      : "";
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    const ps = `
-      Add-Type -AssemblyName System.Windows.Forms
-      $shell = New-Object -ComObject WScript.Shell
-      $activated = $false
-      ${pidActivation}
-      ${titleActivation}
-      if (-not $activated) {
-        try { $activated = $shell.AppActivate('YouTube') } catch { }
-      }
-      if (-not $activated) {
-        try { $activated = $shell.AppActivate('Google Chrome') } catch { }
-      }
-      if ($activated) {
-        Start-Sleep -Milliseconds 120
-        [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
-        Write-Host "[activateYouTubeAndSendKey] Sent key '${escapedKey}'"
-      } else {
-        Write-Host "[activateYouTubeAndSendKey] Could not activate a YouTube window"
-      }
-    `;
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-    console.log("[activateYouTubeAndSendKey] Queuing PowerShell command");
-    queuePowerShellCommand(ps);
+  [DllImport("user32.dll")]
+  public static extern bool IsWindow(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr OpenThread(uint dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+  [DllImport("kernel32.dll")]
+  public static extern bool CloseHandle(IntPtr hObject);
+}
+"@
+
+$activated = $false
+$targetHwnd = 0
+
+${pid !== null ? `# Try to find window by process ID - just use MainWindowHandle directly
+$process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+if ($process) {
+  $mainWindow = $process.MainWindowHandle
+  if ($mainWindow -ne 0 -and [Win32]::IsWindow($mainWindow)) {
+    $targetHwnd = $mainWindow
+    Write-Host "Found window by PID: ${pid}, HWND: $mainWindow"
+  }
+}
+` : ''}
+
+# If PID method failed, try by title
+if ($targetHwnd -eq 0 -and '${escapedTitle}'.Length -gt 0) {
+  $shell = New-Object -ComObject WScript.Shell
+  $activated = $shell.AppActivate('${escapedTitle}')
+  if ($activated) {
+    Start-Sleep -Milliseconds 120
+    [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+    Write-Host "[activateYouTubeAndSendKey] Sent key '${escapedKey}' via title"
+    return
+  }
+}
+
+# If we have a valid HWND, activate it
+if ($targetHwnd -ne 0) {
+  # Check if this window is already foreground
+  $currentForeground = [Win32]::GetForegroundWindow()
+  if ($currentForeground -eq $targetHwnd) {
+    # Already focused, use media key (more reliable than SendKeys)
+    Start-Sleep -Milliseconds 50
+    ${key === 'k' ? `# Send Play/Pause media key (VK_MEDIA_PLAY_PAUSE = 0xB3)
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class KeySender {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+}
+"@
+[KeySender]::keybd_event(0xB3, 0, 0, 0)
+Start-Sleep -Milliseconds 50
+[KeySender]::keybd_event(0xB3, 0, 2, 0)
+Write-Host "[activateYouTubeAndSendKey] Window already focused, sent Play/Pause media key"
+` : `[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+Write-Host "[activateYouTubeAndSendKey] Window already focused, sent key '${escapedKey}'"
+`}
+  } else {
+    # Need to focus first
+    [Win32]::ShowWindow($targetHwnd, 9)  # SW_RESTORE
+    [Win32]::SetForegroundWindow($targetHwnd)
+    Start-Sleep -Milliseconds 200  # Increased delay to ensure focus is established
+    ${key === 'k' ? `# Send Play/Pause media key
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class KeySender {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+}
+"@
+[KeySender]::keybd_event(0xB3, 0, 0, 0)
+Start-Sleep -Milliseconds 50
+[KeySender]::keybd_event(0xB3, 0, 2, 0)
+Write-Host "[activateYouTubeAndSendKey] Activated window and sent Play/Pause media key"
+` : `[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+Write-Host "[activateYouTubeAndSendKey] Activated window and sent key '${escapedKey}'"
+`}
+  }
+} else {
+  Write-Host "[activateYouTubeAndSendKey] Could not activate a YouTube window"
+}`;
+
+    console.log("[activateYouTubeAndSendKey] Executing immediately (bypassing queue)");
+    // Execute immediately instead of queuing to avoid delay
+    exec(ps, { shell: 'powershell.exe' }, (error, stdout, stderr) => {
+      if (error) console.error("[activateYouTubeAndSendKey] Error:", error);
+      if (stdout) console.log("[activateYouTubeAndSendKey] stdout:", stdout.trim());
+      if (stderr) console.error("[activateYouTubeAndSendKey] stderr:", stderr);
+    });
   } else if (isLinux) {
     // Linux: Use xdotool to find and activate YouTube window, then send key
-    const linuxCmd = `
-      # Try to find YouTube window by title
-      WINDOW_ID=$(xdotool search --name "${escapedTitle}" | head -1)
-      if [ -z "$WINDOW_ID" ]; then
-        # Try generic YouTube
-        WINDOW_ID=$(xdotool search --name "YouTube" | head -1)
-      fi
-      if [ -z "$WINDOW_ID" ]; then
-        # Try Chrome
-        WINDOW_ID=$(xdotool search --name "Google Chrome" | head -1)
-      fi
-      if [ -n "$WINDOW_ID" ]; then
-        xdotool windowactivate "$WINDOW_ID"
-        sleep 0.12
-        xdotool key "${escapedKey}"
-        echo "[activateYouTubeAndSendKey] Sent key '${escapedKey}' to window $WINDOW_ID"
-      else
-        echo "[activateYouTubeAndSendKey] Could not activate a YouTube window"
-      fi
-    `;
-    
-    console.log("[activateYouTubeAndSendKey] Queuing Linux command");
-    queuePowerShellCommand(linuxCmd);
+    const linuxCmd = `# Try to find YouTube window by title
+WINDOW_ID=$(xdotool search --name "${escapedTitle}" | head -1)
+if [ -z "$WINDOW_ID" ]; then
+  # Try generic YouTube
+  WINDOW_ID=$(xdotool search --name "YouTube" | head -1)
+fi
+if [ -z "$WINDOW_ID" ]; then
+  # Try Chrome
+  WINDOW_ID=$(xdotool search --name "Google Chrome" | head -1)
+fi
+if [ -n "$WINDOW_ID" ]; then
+  xdotool windowactivate "$WINDOW_ID"
+  sleep 0.12
+  xdotool key "${escapedKey}"
+  echo "[activateYouTubeAndSendKey] Sent key '${escapedKey}' to window $WINDOW_ID"
+else
+  echo "[activateYouTubeAndSendKey] Could not activate a YouTube window"
+fi`;
+
+    console.log("[activateYouTubeAndSendKey] Executing Linux command immediately");
+    exec(linuxCmd, { shell: 'bash' }, (error, stdout, stderr) => {
+      if (error) console.error("[activateYouTubeAndSendKey] Error:", error);
+      if (stdout) console.log("[activateYouTubeAndSendKey] stdout:", stdout.trim());
+      if (stderr) console.error("[activateYouTubeAndSendKey] stderr:", stderr);
+    });
   }
 }
 
@@ -532,6 +605,101 @@ const NOOK_WIDTH = 750;
 const NOOK_HEIGHT = 140;
 
 // ---------------- VIDEO DETECTION (YouTube Only) ----------------
+
+// Helper function to find YouTube window among all windows (not just active)
+async function findYouTubeWindow() {
+  if (!isWindows) return null;
+
+  try {
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type @"
+      using System;
+      using System.Runtime.InteropServices;
+      public class Win32 {
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT {
+          public int Left;
+          public int Top;
+          public int Right;
+          public int Bottom;
+        }
+      }
+"@
+
+      $shellWindow = [Win32]::GetShellWindow()
+      $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
+
+      foreach ($p in $process) {
+        $hwnd = $p.MainWindowHandle
+
+        # Skip the shell window (desktop) and very small windows
+        if ($hwnd -eq $shellWindow) { continue }
+
+        $rect = New-Object Win32+RECT
+        if ([Win32]::GetWindowRect($hwnd, [ref]$rect) -and [Win32]::IsWindowVisible($hwnd)) {
+          $width = $rect.Right - $rect.Left
+          $height = $rect.Bottom - $rect.Top
+
+          # Skip very small windows
+          if ($width -lt 400 -or $height -lt 300) { continue }
+
+          # Get window title
+          $title = New-Object System.Text.StringBuilder 256
+          [Win32]::GetWindowText($hwnd, $title, 256) | Out-Null
+          $titleStr = $title.ToString()
+
+          # Check if title contains "YouTube"
+          if ($titleStr -match "YouTube") {
+            Write-Output "FOUND|$($titleStr)|$($p.Id)"
+            return
+          }
+        }
+      }
+
+      Write-Output "NOT_FOUND"
+    `;
+
+    const { stdout } = await execAsync(psScript, { shell: 'powershell.exe' });
+    const output = stdout.trim();
+
+    if (output.startsWith("FOUND|")) {
+      const parts = output.split("|");
+      const title = parts[1];
+      const processId = parseInt(parts[2], 10);
+      console.log("[YouTube Window Search] Found YouTube window:", title, "PID:", processId);
+      return {
+        title: title,
+        owner: { name: "Browser", processId: processId },
+        url: "" // URL not available from title-only check
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error searching for YouTube window:", error.message);
+    return null;
+  }
+}
+
 function computeIsMaximized(windowBounds, screenBounds) {
   let positionTolerance, sizeTolerance;
 
@@ -991,8 +1159,14 @@ async function checkVideoPlayback() {
   if (isVideoCheckRunning) return;
   isVideoCheckRunning = true;
   try {
-    // Dynamic import for ES module - use activeWindow export
-    const windowInfo = await getActiveWindowInfo();
+    // First, try to find YouTube in ALL windows (not just active)
+    // This handles the case where YouTube is already open before Smootie starts
+    let windowInfo = await findYouTubeWindow();
+
+    // If no YouTube found in all windows, fall back to active window check
+    if (!windowInfo) {
+      windowInfo = await getActiveWindowInfo();
+    }
 
     lastActiveWindowInfo = windowInfo || null;
     lastActiveWindowAtMs = Date.now();
@@ -1001,7 +1175,7 @@ async function checkVideoPlayback() {
     const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
     const title = (windowInfo?.title || "").toLowerCase();
     const isScreenpressoActive = ownerName.includes('screenpresso') || title.includes('screenpresso');
-    
+
     // Debug logging to see what's detected
     console.log("[Window Detection] ownerName:", ownerName, "title:", title, "isScreenpressoActive:", isScreenpressoActive);
 
@@ -1019,23 +1193,23 @@ async function checkVideoPlayback() {
     const timeSinceStartup = Date.now() - appStartupTime;
     if (timeSinceStartup > 3000) {
       const isAnyFullscreen = await isAnyWindowFullscreen();
-      
+
       const shouldShow = !isAnyFullscreen;
-      
+
       if (lastMaximizedState === null || shouldShow !== lastMaximizedState) {
         lastMaximizedState = shouldShow;
         console.log("[fullscreen] State changed to:", shouldShow ? "SHOW" : "HIDE");
         setIslandVisible(shouldShow);
       }
     }
-    
+
     // Check if it's a browser window (has URL) or known browser
     // ownerName and title are already declared above (line 940-941)
     const url = (windowInfo?.url || "").toLowerCase();
-    
+
     // Any window with a URL is likely a browser, plus check known browsers
-    const isBrowser = (url && url.length > 0) || 
-                     ownerName.includes('chrome') || ownerName.includes('edge') || 
+    const isBrowser = (url && url.length > 0) ||
+                     ownerName.includes('chrome') || ownerName.includes('edge') ||
                      ownerName.includes('firefox') || ownerName.includes('brave') ||
                      ownerName.includes('opera') || ownerName.includes('safari') ||
                      ownerName.includes('vivaldi') || ownerName.includes('arc') ||
@@ -1105,6 +1279,15 @@ async function checkVideoPlayback() {
       win.videoUpdateTimeout = null;
     }, 50);
   }
+
+        // When YouTube video is detected, assume it's playing (auto-play behavior)
+        // This ensures the button shows PAUSE icon when YouTube is detected
+        if (videoInfo.source === "youtube" && lastPlaybackState !== 'playing') {
+          lastPlaybackState = 'playing';
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("update-playback-state", 'playing');
+          }
+        }
       }
 
       if (videoInfo.source === "youtube" && (!videoInfo.thumbnail || videoInfo.videoId === "detected")) {
