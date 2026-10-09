@@ -564,9 +564,8 @@
     }
 
     if (playBtn) {
-      // Default to paused state visually (show Play icon).
-      // This keeps the button semantics intuitive when a YouTube video is initially paused.
-      logicalPlaybackState = 'paused';
+      // Default to playing state (show Pause icon) to match YouTube's behavior
+      logicalPlaybackState = 'playing';
       updatePlaybackState(logicalPlaybackState);
 
       playBtn.addEventListener("click", (e) => {

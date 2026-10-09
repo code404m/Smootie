@@ -1180,8 +1180,8 @@ function startVideoDetection() {
   checkVideoPlayback();
   startPlaybackStatePolling();
   // Then check frequently so maximization changes are detected quickly
-  // 280ms is a good balance between responsiveness and CPU usage
-  videoDetectionInterval = setInterval(checkVideoPlayback, 280);
+  // 100ms for faster YouTube detection
+  videoDetectionInterval = setInterval(checkVideoPlayback, 100);
 }
 
 function stopVideoDetection() {
