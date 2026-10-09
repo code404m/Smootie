@@ -23,7 +23,7 @@ html, body {
   border-radius: 0 0 33px 33px;
   padding: 8px 16px;
   padding-top: 3px;
-  display: none;
+  display: flex;
   flex-direction: column;
   box-sizing: border-box;
   border: none;
