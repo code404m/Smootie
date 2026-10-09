@@ -143,5 +143,10 @@ contextBridge.exposeInMainWorld("SmootieAPI", {
     // Get desktop sources for recording
     getDesktopSources: () => {
         return ipcRenderer.invoke("get-desktop-sources");
+    },
+
+    // Notify main process of user interaction with island
+    islandInteraction: () => {
+        ipcRenderer.send("island-interaction");
     }
 });

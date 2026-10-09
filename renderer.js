@@ -158,7 +158,13 @@
     if (clockModeEl && clockModeEl.contains(e.target)) {
       debugLog("Clock island clicked, switching mode");
       e.stopPropagation(); // Prevent double-click detection
+      debugLog("Current mode before switch:", currentMode);
       applyMode(currentMode === 1 ? 2 : 1);
+      debugLog("Current mode after switch:", currentMode);
+      // Notify main process of user interaction
+      if (window.SmootieAPI && window.SmootieAPI.islandInteraction) {
+        window.SmootieAPI.islandInteraction();
+      }
     }
   });
 

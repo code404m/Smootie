@@ -49,6 +49,8 @@ let lastYouTubeWindowInfo = null;
 let lastYouTubeWindowAtMs = 0;
 let lastIslandVisible = null;
 let hideTimer = null;
+let appStartupTime = Date.now();
+let lastInteractionTime = Date.now();
 
 function setIslandVisible(visible) {
   if (lastIslandVisible === visible) return;
@@ -67,6 +69,15 @@ function setIslandVisible(visible) {
       console.log(`[Window] Repositioned to center: x=${x}, y=${y}`);
     }
   }
+}
+
+// Island is always visible now - fullscreen detection is informational only
+function showIsland() {
+  setIslandVisible(true);
+}
+
+function hideIsland() {
+  setIslandVisible(false);
 }
 
 // Platform-specific process variables for media controls
@@ -587,20 +598,35 @@ async function isAnyWindowFullscreen() {
       $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
       $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
       
+      $fullscreenFound = $false
       $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
       foreach ($p in $process) {
         $rect = New-Object Win32+RECT
         if ([Win32]::GetWindowRect($p.MainWindowHandle, [ref]$rect) -and [Win32]::IsWindowVisible($p.MainWindowHandle)) {
           $width = $rect.Right - $rect.Left
           $height = $rect.Bottom - $rect.Top
-          # Check if window covers most of the screen (within 50px tolerance)
-          if ($rect.Left -le 50 -and $rect.Top -le 50 -and $width -ge ($screenWidth - 50) -and $height -ge ($screenHeight - 50)) {
-            Write-Output "FULLSCREEN"
-            exit
+          # Get window title to exclude certain windows
+          $title = New-Object System.Text.StringBuilder 256
+          [Win32]::GetWindowText($p.MainWindowHandle, $title, 256) | Out-Null
+          $titleStr = $title.ToString()
+          
+          # Exclude Smootie/Electron windows and very small windows
+          if ($titleStr -notmatch "Smootie|Electron" -and $width -gt 400 -and $height -gt 300) {
+            # STRICT DETECTION: Window must be EXACTLY at (0,0) and match screen dimensions exactly
+            # No tolerance - only true fullscreen windows will be detected
+            if ($rect.Left -eq 0 -and $rect.Top -eq 0 -and $width -eq $screenWidth -and $height -eq $screenHeight) {
+              $fullscreenFound = $true
+              break
+            }
           }
         }
       }
-      Write-Output "NOT_FULLSCREEN"
+      
+      if ($fullscreenFound) {
+        Write-Output "FULLSCREEN"
+      } else {
+        Write-Output "NOT_FULLSCREEN"
+      }
     `;
 
     const { stdout } = await execAsync(psScript, { shell: 'powershell.exe' });
@@ -911,16 +937,16 @@ async function checkVideoPlayback() {
     lastActiveWindowInfo = windowInfo || null;
     lastActiveWindowAtMs = Date.now();
 
-    // Check if ANY window is fullscreen (not just the active one)
-    const isAnyFullscreen = await isAnyWindowFullscreen();
-
-    // Always update island visibility based on fullscreen state
-    setIslandVisible(!isAnyFullscreen);
-
-    // Track state changes for debugging/logging
-    if (lastMaximizedState === null || isAnyFullscreen !== lastMaximizedState) {
-      lastMaximizedState = isAnyFullscreen;
-      console.log("[fullscreen] State changed to:", isAnyFullscreen);
+    // Fullscreen detection is now purely informational - does NOT affect island visibility
+    // The island remains visible regardless of fullscreen state
+    const timeSinceStartup = Date.now() - appStartupTime;
+    if (timeSinceStartup > 3000) {
+      const isAnyFullscreen = await isAnyWindowFullscreen();
+      // Just log the state, don't change visibility
+      if (lastMaximizedState === null || isAnyFullscreen !== lastMaximizedState) {
+        lastMaximizedState = isAnyFullscreen;
+        console.log("[fullscreen] State changed to:", isAnyFullscreen, "(informational only)");
+      }
     }
     
     // Check if it's a browser window (has URL) or known browser
@@ -1645,6 +1671,12 @@ function setupIpcHandlers() {
       console.error("Error checking maximized state:", error.message);
       return false;
     }
+  });
+
+  // Handle user interaction with island
+  ipcMain.on("island-interaction", () => {
+    lastInteractionTime = Date.now();
+    console.log("[Interaction] User interacted with island, skipping fullscreen detection for 2s");
   });
 
   // Screenshot capture
