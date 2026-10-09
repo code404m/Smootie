@@ -572,9 +572,11 @@
       playBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Play button clicked");
         debugLog("Play button clicked");
         
         if (playToggleInFlight) {
+          console.log("[Music Controls] Play toggle already in flight, ignoring");
           debugLog("Play toggle already in flight, ignoring");
           return;
         }
@@ -587,6 +589,7 @@
 
         // Send play/pause command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPlayPause) {
+          console.log("[Music Controls] Calling videoPlayPause API");
           debugLog("Calling videoPlayPause API");
           window.SmootieAPI.videoPlayPause();
           // Force a quick state refresh so the button reflects the real YouTube state
@@ -594,7 +597,8 @@
             setTimeout(() => window.SmootieAPI.requestVideoCheck(), 300);
           }
         } else {
-          console.error("SmootieAPI.videoPlayPause not available");
+          console.error("[Music Controls] SmootieAPI.videoPlayPause not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
 
         setTimeout(() => {
@@ -602,12 +606,15 @@
           playBtn.classList.remove("is-busy");
         }, 450);
       });
+    } else {
+      console.error("[Music Controls] Play button not found in DOM");
     }
 
     if (prevBtn) {
       prevBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Previous button clicked");
         debugLog("Previous button clicked");
         
         // Visual feedback
@@ -618,18 +625,23 @@
         
         // Send previous command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPrevious) {
+          console.log("[Music Controls] Calling videoPrevious API");
           debugLog("Calling videoPrevious API");
           window.SmootieAPI.videoPrevious();
         } else {
-          console.error("SmootieAPI.videoPrevious not available");
+          console.error("[Music Controls] SmootieAPI.videoPrevious not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+    } else {
+      console.error("[Music Controls] Previous button not found in DOM");
     }
 
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Next button clicked");
         debugLog("Next button clicked");
         
         // Visual feedback
@@ -640,12 +652,16 @@
         
         // Send next command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoNext) {
+          console.log("[Music Controls] Calling videoNext API");
           debugLog("Calling videoNext API");
           window.SmootieAPI.videoNext();
         } else {
-          console.error("SmootieAPI.videoNext not available");
+          console.error("[Music Controls] SmootieAPI.videoNext not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+    } else {
+      console.error("[Music Controls] Next button not found in DOM");
     }
 
     controlsInitialized = true;

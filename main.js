@@ -616,10 +616,14 @@ async function isAnyWindowFullscreen() {
       $screenX = $primaryScreen.Bounds.X
       $screenY = $primaryScreen.Bounds.Y
       
+      Write-Host "Screen bounds: X=$screenX, Y=$screenY, Width=$screenWidth, Height=$screenHeight"
+      
       $fullscreenFound = $false
       $shellWindow = [Win32]::GetShellWindow()
       
       $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
+      Write-Host "Checking $($process.Count) processes with windows"
+      
       foreach ($p in $process) {
         $hwnd = $p.MainWindowHandle
         
@@ -652,7 +656,7 @@ async function isAnyWindowFullscreen() {
           
           if ($isMaximized) {
             $fullscreenFound = $true
-            Write-Host "Found maximized window: $($titleStr)"
+            Write-Host "Found maximized window: $($titleStr) (HWND: $hwnd)"
             break
           }
           
@@ -668,7 +672,7 @@ async function isAnyWindowFullscreen() {
           
           if ($coversScreen) {
             $fullscreenFound = $true
-            Write-Host "Found fullscreen-covering window: $($titleStr)"
+            Write-Host "Found fullscreen-covering window: $($titleStr) (Rect: $($rect.Left),$($rect.Top),$($width),$($height))"
             break
           }
         }
@@ -681,7 +685,9 @@ async function isAnyWindowFullscreen() {
       }
     `;
 
-    const { stdout } = await execAsync(psScript, { shell: 'powershell.exe' });
+    const { stdout, stderr } = await execAsync(psScript, { shell: 'powershell.exe' });
+    console.log("[Fullscreen Detection] PowerShell output:", stdout);
+    if (stderr) console.log("[Fullscreen Detection] PowerShell stderr:", stderr);
     return stdout.trim() === 'FULLSCREEN';
   } catch (error) {
     console.error("Error checking fullscreen windows:", error.message);
@@ -1451,7 +1457,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_PLAY_PAUSE");
       }
     } catch (error) {
-      console.error("Error controlling video playback:", error.message);
+      console.error("[IPC] Error controlling video playback:", error.message);
     }
   });
 
@@ -1494,7 +1500,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_NEXT_TRACK");
       }
     } catch (error) {
-      console.error("Error controlling next video:", error.message);
+      console.error("[IPC] Error controlling next video:", error.message);
     }
   });
 
@@ -1537,7 +1543,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_PREV_TRACK");
       }
     } catch (error) {
-      console.error("Error controlling previous video:", error.message);
+      console.error("[IPC] Error controlling previous video:", error.message);
     }
   });
 
