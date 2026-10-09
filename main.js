@@ -53,7 +53,20 @@ let hideTimer = null;
 function setIslandVisible(visible) {
   if (lastIslandVisible === visible) return;
   lastIslandVisible = visible;
-  if (win && !win.isDestroyed()) win.webContents.send(visible ? "island-show" : "island-hide");
+  
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(visible ? "island-show" : "island-hide");
+    
+    // When showing the island, ensure it's centered
+    if (visible) {
+      const primary = screen.getPrimaryDisplay();
+      const screenWidth = primary.bounds.width;
+      const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
+      const y = primary.bounds.y;
+      win.setPosition(x, y);
+      console.log(`[Window] Repositioned to center: x=${x}, y=${y}`);
+    }
+  }
 }
 
 // Platform-specific process variables for media controls
@@ -497,7 +510,6 @@ function debugLog(...args) {
 
 const NOOK_WIDTH = 750;
 const NOOK_HEIGHT = 140;
-const SHADOW_PADDING = 60; // Extra space for shadow rendering
 
 // ---------------- VIDEO DETECTION (YouTube Only) ----------------
 function computeIsMaximized(windowBounds, screenBounds) {
@@ -536,6 +548,67 @@ async function getActiveWindowInfo() {
     }
   }
   return activeWindowFn();
+}
+
+// Check if ANY window is fullscreen (not just the active one)
+async function isAnyWindowFullscreen() {
+  if (!isWindows) return false;
+
+  try {
+    // Use PowerShell to get all visible windows and check their bounds
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type @"
+      using System;
+      using System.Runtime.InteropServices;
+      public class Win32 {
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+        
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+        
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+        
+        [DllImport("user32.dll")]
+        public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+        
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT {
+          public int Left;
+          public int Top;
+          public int Right;
+          public int Bottom;
+        }
+      }
+"@
+      
+      $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+      $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
+      
+      $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
+      foreach ($p in $process) {
+        $rect = New-Object Win32+RECT
+        if ([Win32]::GetWindowRect($p.MainWindowHandle, [ref]$rect) -and [Win32]::IsWindowVisible($p.MainWindowHandle)) {
+          $width = $rect.Right - $rect.Left
+          $height = $rect.Bottom - $rect.Top
+          # Check if window covers most of the screen (within 50px tolerance)
+          if ($rect.Left -le 50 -and $rect.Top -le 50 -and $width -ge ($screenWidth - 50) -and $height -ge ($screenHeight - 50)) {
+            Write-Output "FULLSCREEN"
+            exit
+          }
+        }
+      }
+      Write-Output "NOT_FULLSCREEN"
+    `;
+
+    const { stdout } = await execAsync(psScript, { shell: 'powershell.exe' });
+    return stdout.trim() === 'FULLSCREEN';
+  } catch (error) {
+    console.error("Error checking fullscreen windows:", error.message);
+    return false;
+  }
 }
 
 // Linux active window detection using xdotool
@@ -838,26 +911,16 @@ async function checkVideoPlayback() {
     lastActiveWindowInfo = windowInfo || null;
     lastActiveWindowAtMs = Date.now();
 
-    let isMaximized = false;
-    if (windowInfo?.bounds) {
-      const primaryDisplay = screen.getPrimaryDisplay();
-      isMaximized = computeIsMaximized(windowInfo.bounds, primaryDisplay.bounds);
+    // Check if ANY window is fullscreen (not just the active one)
+    const isAnyFullscreen = await isAnyWindowFullscreen();
 
-      // Always update island visibility based on current maximized state
-      setIslandVisible(!isMaximized);
+    // Always update island visibility based on fullscreen state
+    setIslandVisible(!isAnyFullscreen);
 
-      // Still track state changes for debugging/logging
-      if (lastMaximizedState === null || isMaximized !== lastMaximizedState) {
-        lastMaximizedState = isMaximized;
-        console.log("[maximized] State changed to:", isMaximized);
-      }
-    } else {
-      // No window bounds available, assume not maximized and show island
-      setIslandVisible(true);
-      if (lastMaximizedState !== false) {
-        lastMaximizedState = false;
-        console.log("[maximized] No window bounds, assuming not maximized");
-      }
+    // Track state changes for debugging/logging
+    if (lastMaximizedState === null || isAnyFullscreen !== lastMaximizedState) {
+      lastMaximizedState = isAnyFullscreen;
+      console.log("[fullscreen] State changed to:", isAnyFullscreen);
     }
     
     // Check if it's a browser window (has URL) or known browser
@@ -1171,17 +1234,12 @@ function createWindow() {
   const screenWidth = primary.bounds.width;
   const screenY = primary.bounds.y || 0;
 
-  // Make window larger to accommodate shadow
-  const windowWidth = NOOK_WIDTH + (SHADOW_PADDING * 2);
-  const windowHeight = NOOK_HEIGHT + SHADOW_PADDING;
-
-  // Offset position to keep island visually centered
-  const x = Math.round(primary.bounds.x + (screenWidth - windowWidth) / 2);
+  const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
   const y = primary.bounds.y; // Always at the very top of the screen
 
   win = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
+    width: NOOK_WIDTH,
+    height: NOOK_HEIGHT,
     x, y,
     frame: false,
     transparent: true,
@@ -1220,8 +1278,6 @@ function createWindow() {
     setTimeout(() => {
       win.showInactive();
       console.log('[Window] Window shown, re-applying display affinity');
-      // Make transparent areas click-through
-      win.setIgnoreMouseEvents(true, { forward: true });
       // Set window to be excluded from screen capture on Windows
       // This keeps the island visible to the user but excludes it from screenshots
       if (isWindows) {
@@ -1566,7 +1622,6 @@ function setupIpcHandlers() {
         hideTimer = null;
         win.showInactive();
         win.setAlwaysOnTop(true, "screen-saver");
-        win.setIgnoreMouseEvents(true, { forward: true });
         console.log("Window shown, alwaysOnTop re-enabled");
       } catch (error) {
         console.error("Error showing window:", error);
@@ -1582,14 +1637,10 @@ function setupIpcHandlers() {
     app.quit();
   });
 
-  // Check if any window is maximized using active-win package
+  // Check if any window is maximized using new fullscreen detection
   ipcMain.handle("is-window-maximized", async () => {
     try {
-      const mod = await import("active-win");
-      const activeWindow = await mod.activeWindow();
-      if (!activeWindow?.bounds) return false;
-      const primaryDisplay = screen.getPrimaryDisplay();
-      return computeIsMaximized(activeWindow.bounds, primaryDisplay.bounds);
+      return await isAnyWindowFullscreen();
     } catch (error) {
       console.error("Error checking maximized state:", error.message);
       return false;
