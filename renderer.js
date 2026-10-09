@@ -522,7 +522,7 @@
   let nextBtn = null;
   let controlsInitialized = false;
   let playToggleInFlight = false;
-  let logicalPlaybackState = "paused"; // Our best guess of current playback state
+  let logicalPlaybackState = "playing"; // Default to playing when YouTube is detected
 
   function updatePlaybackState(state) {
     if (!playBtn) return;

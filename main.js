@@ -647,6 +647,8 @@ async function isAnyWindowFullscreen() {
           if ($titleStr -match "Smootie|Electron" -or 
               $titleStr -match "Taskbar|Start menu|Search" -or
               $titleStr -match "Desktop Window Manager|DWM" -or
+              $titleStr -match "Windows Input Experience" -or
+              $titleStr -match "TextInputHost" -or
               $titleStr -eq "") { 
             continue 
           }
