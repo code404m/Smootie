@@ -20,11 +20,13 @@
   // -------- MODE SWITCHING (M key) --------
   let clockModeEl = null;
   let nookModeEl = null;
+  let nookContent = null;
 
   function initializeModeElements() {
     clockModeEl = document.getElementById("mode-clock");
     nookModeEl = document.getElementById("mode-nook");
-    debugLog("Mode elements found:", { clockModeEl: !!clockModeEl, nookModeEl: !!nookModeEl });
+    nookContent = document.querySelector(".nook-content");
+    debugLog("Mode elements found:", { clockModeEl: !!clockModeEl, nookModeEl: !!nookModeEl, nookContent: !!nookContent });
   }
 
   function applyMode(mode) {
@@ -153,40 +155,68 @@
     }
   });
 
-  // Click on clock island to switch (single click)
+  // Click on clock island to switch to Mode 2 (single click)
   document.addEventListener("click", (e) => {
     if (clockModeEl && clockModeEl.contains(e.target)) {
-      debugLog("Clock island clicked, switching mode");
-      e.stopPropagation(); // Prevent double-click detection
+      debugLog("Clock island clicked, switching to Mode 2");
+      e.stopPropagation();
       debugLog("Current mode before switch:", currentMode);
-      applyMode(currentMode === 1 ? 2 : 1);
+      applyMode(2);
       debugLog("Current mode after switch:", currentMode);
     }
   });
 
-  // Double-click anywhere else (not on clock island) to switch
-  let lastClickTime = 0;
-  let lastClickTarget = null;
+  // Click on nook island background to switch back to Mode 1 (single click)
+  function setupNookClickHandler() {
+    if (!nookContent) {
+      nookContent = document.querySelector(".nook-content");
+    }
+    
+    if (nookContent) {
+      nookContent.addEventListener("click", (e) => {
+        if (currentMode === 2) {
+          // Check if clicking on interactive elements
+          const interactiveSelectors = [
+            'button',
+            '.music-control-btn',
+            '.album-art',
+            '.profile-picture',
+            '.calendar-events-icon',
+            'input',
+            'select',
+            'textarea',
+            'a',
+            '[role="button"]',
+            '.clickable'
+          ];
+          
+          let isInteractive = false;
+          let element = e.target;
+          while (element && element !== nookContent) {
+            if (interactiveSelectors.some(selector => element.matches?.(selector))) {
+              isInteractive = true;
+              break;
+            }
+            element = element.parentElement;
+          }
+          
+          // Only switch to Mode 1 if clicking on non-interactive background
+          if (!isInteractive) {
+            debugLog("Nook content background clicked, switching to Mode 1");
+            e.stopPropagation();
+            applyMode(1);
+          }
+        }
+      });
+    }
+  }
   
-  document.addEventListener("click", (e) => {
-    // Don't trigger double-click if clicking on clock island
-    if (clockModeEl && clockModeEl.contains(e.target)) {
-      return;
-    }
-    
-    const currentTime = new Date().getTime();
-    const timeDiff = currentTime - lastClickTime;
-    const sameTarget = lastClickTarget === e.target;
-    
-    if (timeDiff < 300 && timeDiff > 0 && sameTarget) { // Double click on same element
-      debugLog("Double-click detected, switching mode");
-      e.stopPropagation();
-      applyMode(currentMode === 1 ? 2 : 1);
-    }
-    
-    lastClickTime = currentTime;
-    lastClickTarget = e.target;
-  });
+  // Setup nook click handler after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupNookClickHandler, { once: true });
+  } else {
+    setupNookClickHandler();
+  }
 
   // -------- CLOCK (Mode 1) --------
   function updateClock() {
@@ -628,14 +658,21 @@
     setupMusicControls();
   }
 
-  // Top bar buttons
-  const menuBtn = document.getElementById("menu-btn");
-  const menuMenu = document.getElementById("menu-menu");
-  const menuStartupToggle = document.getElementById("menu-startup-toggle");
-  const homeTabBtn = document.getElementById("tab-tray");
+  // Top bar buttons (will be initialized after DOM is ready)
+  let menuBtn = null;
+  let menuMenu = null;
+  let menuStartupToggle = null;
+  let homeTabBtn = null;
   
   function setupTopBarButtons() {
     console.log("[Renderer] setupTopBarButtons called");
+    
+    // Initialize button references
+    menuBtn = document.getElementById("menu-btn");
+    menuMenu = document.getElementById("menu-menu");
+    menuStartupToggle = document.getElementById("menu-startup-toggle");
+    homeTabBtn = document.getElementById("tab-tray");
+    
     const screenshotBtn = document.getElementById("screenshot-btn");
     const recordBtn = document.getElementById("record-btn");
     const recordingIndicator = document.getElementById("recording-indicator");
@@ -868,9 +905,13 @@
   
   // Setup top bar buttons after DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupTopBarButtons, { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      setupTopBarButtons();
+      setupHomeAndStartup();
+    }, { once: true });
   } else {
     setupTopBarButtons();
+    setupHomeAndStartup();
   }
 
   if (menuMenu) {
@@ -897,34 +938,42 @@
     }
   }
 
-  if (menuStartupToggle) {
-    initializeStartupToggle();
-    menuStartupToggle.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!window.SmootieAPI?.setStartupEnabled) return;
-      const currentState = menuStartupToggle.getAttribute("aria-pressed") === "true";
-      const nextState = !currentState;
-      updateStartupToggleUI(nextState);
-      if (menuMenu) menuMenu.style.display = "none";
-      try {
-        const result = await window.SmootieAPI.setStartupEnabled(nextState);
-        if (typeof result === "boolean") {
-          updateStartupToggleUI(result);
+  // Setup home tab and startup toggle after DOM is ready
+  function setupHomeAndStartup() {
+    homeTabBtn = document.getElementById("tab-tray");
+    menuStartupToggle = document.getElementById("menu-startup-toggle");
+    
+    // Home tab switches to Mode 1
+    if (homeTabBtn) {
+      homeTabBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        debugLog("Home tab clicked, returning to Mode 1");
+        applyMode(1); // Always switch to Mode 1 (clock)
+      });
+    }
+    
+    // Initialize startup toggle
+    if (menuStartupToggle) {
+      initializeStartupToggle();
+      menuStartupToggle.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!window.SmootieAPI?.setStartupEnabled) return;
+        const currentState = menuStartupToggle.getAttribute("aria-pressed") === "true";
+        const nextState = !currentState;
+        updateStartupToggleUI(nextState);
+        if (menuMenu) menuMenu.style.display = "none";
+        try {
+          const result = await window.SmootieAPI.setStartupEnabled(nextState);
+          if (typeof result === "boolean") {
+            updateStartupToggleUI(result);
+          }
+        } catch (error) {
+          console.error("Failed to toggle startup:", error);
+          updateStartupToggleUI(currentState);
         }
-      } catch (error) {
-        console.error("Failed to toggle startup:", error);
-        updateStartupToggleUI(currentState);
-      }
-    });
+      });
+    }
   }
-
-  // DISABLED: Home tab auto-switch to Mode 1 (was causing accidental mode switches)
-  // if (homeTabBtn) {
-  //   homeTabBtn.addEventListener("click", () => {
-  //     debugLog("Home tab clicked, returning to Mode 1");
-  //     applyMode(1); // Always switch to Mode 1 (clock)
-  //   });
-  // }
 
   // Close settings menu when clicking outside
   document.addEventListener("click", () => {
@@ -933,18 +982,7 @@
     }
   });
 
-  // Click on nook-tray background to return to mode 1 (clock)
-  const nookTray = document.getElementById("mode-nook");
-  // DISABLED: Background click auto-switch to Mode 1 (was causing accidental mode switches)
-  // if (nookTray) {
-  //   nookTray.addEventListener("click", (e) => {
-  //     // Only switch to mode 1 if clicking on the background, not interactive elements
-  //     if (e.target === nookTray || e.target.classList.contains("nook-content")) {
-  //       debugLog("Background clicked, returning to Mode 1");
-  //       applyMode(1); // Switch to clock mode
-  //     }
-  //   });
-  // }
+
 
   // Listen for video info updates from main process
   if (window.SmootieAPI) {

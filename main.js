@@ -570,12 +570,12 @@ async function getActiveWindowInfo() {
   return activeWindowFn();
 }
 
-// Check if ANY window is fullscreen (not just the active one)
+// Check if ANY window is maximized or fullscreen (not just the active one)
 async function isAnyWindowFullscreen() {
   if (!isWindows) return false;
 
   try {
-    // Use PowerShell to get all visible windows and check their bounds
+    // Use PowerShell to get all visible windows and check their bounds and maximized state
     const psScript = `
       Add-Type -AssemblyName System.Windows.Forms
       Add-Type @"
@@ -594,6 +594,12 @@ async function isAnyWindowFullscreen() {
         [DllImport("user32.dll")]
         public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
         
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+        
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
+        
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT {
           public int Left;
@@ -604,29 +610,66 @@ async function isAnyWindowFullscreen() {
       }
 "@
       
-      $screenWidth = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
-      $screenHeight = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height
+      $primaryScreen = [System.Windows.Forms.Screen]::PrimaryScreen
+      $screenWidth = $primaryScreen.Bounds.Width
+      $screenHeight = $primaryScreen.Bounds.Height
+      $screenX = $primaryScreen.Bounds.X
+      $screenY = $primaryScreen.Bounds.Y
       
       $fullscreenFound = $false
+      $shellWindow = [Win32]::GetShellWindow()
+      
       $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
       foreach ($p in $process) {
+        $hwnd = $p.MainWindowHandle
+        
+        # Skip the shell window (desktop) and very small windows
+        if ($hwnd -eq $shellWindow) { continue }
+        
         $rect = New-Object Win32+RECT
-        if ([Win32]::GetWindowRect($p.MainWindowHandle, [ref]$rect) -and [Win32]::IsWindowVisible($p.MainWindowHandle)) {
+        if ([Win32]::GetWindowRect($hwnd, [ref]$rect) -and [Win32]::IsWindowVisible($hwnd)) {
           $width = $rect.Right - $rect.Left
           $height = $rect.Bottom - $rect.Top
+          
+          # Skip very small windows
+          if ($width -lt 400 -or $height -lt 300) { continue }
+          
           # Get window title to exclude certain windows
           $title = New-Object System.Text.StringBuilder 256
-          [Win32]::GetWindowText($p.MainWindowHandle, $title, 256) | Out-Null
+          [Win32]::GetWindowText($hwnd, $title, 256) | Out-Null
           $titleStr = $title.ToString()
           
-          # Exclude Smootie/Electron windows and very small windows
-          if ($titleStr -notmatch "Smootie|Electron" -and $width -gt 400 -and $height -gt 300) {
-            # STRICT DETECTION: Window must be EXACTLY at (0,0) and match screen dimensions exactly
-            # No tolerance - only true fullscreen windows will be detected
-            if ($rect.Left -eq 0 -and $rect.Top -eq 0 -and $width -eq $screenWidth -and $height -eq $screenHeight) {
-              $fullscreenFound = $true
-              break
-            }
+          # Exclude Smootie/Electron windows and taskbar-related windows
+          if ($titleStr -match "Smootie|Electron" -or 
+              $titleStr -match "Taskbar|Start menu|Search" -or
+              $titleStr -match "Desktop Window Manager|DWM" -or
+              $titleStr -eq "") { 
+            continue 
+          }
+          
+          # Check if window is maximized using Windows API
+          $isMaximized = [Win32]::IsZoomed($hwnd)
+          
+          if ($isMaximized) {
+            $fullscreenFound = $true
+            Write-Host "Found maximized window: $($titleStr)"
+            break
+          }
+          
+          # Also check if window covers the screen (fullscreen video/game)
+          # Use tolerance for position and size
+          $positionTolerance = 10
+          $sizeTolerance = 20
+          
+          $coversScreen = [Math]::Abs($rect.Left - $screenX) -le $positionTolerance -and
+                          [Math]::Abs($rect.Top - $screenY) -le $positionTolerance -and
+                          $width -ge ($screenWidth - $sizeTolerance) -and
+                          $height -ge ($screenHeight - $sizeTolerance)
+          
+          if ($coversScreen) {
+            $fullscreenFound = $true
+            Write-Host "Found fullscreen-covering window: $($titleStr)"
+            break
           }
         }
       }
@@ -954,11 +997,6 @@ async function checkVideoPlayback() {
     // Debug logging to see what's detected
     console.log("[Window Detection] ownerName:", ownerName, "title:", title, "isScreenpressoActive:", isScreenpressoActive);
 
-    // DISABLED: Fullscreen hiding logic causing issues
-    // Window will now always stay visible to ensure screenshots work properly
-    // If you want to re-enable fullscreen hiding, uncomment the code below
-    
-    /*
     // If Screenpresso is active, ALWAYS show the island and skip fullscreen logic completely
     if (isScreenpressoActive) {
       if (lastMaximizedState !== true) {
@@ -982,7 +1020,6 @@ async function checkVideoPlayback() {
         setIslandVisible(shouldShow);
       }
     }
-    */
     
     // Check if it's a browser window (has URL) or known browser
     // ownerName and title are already declared above (line 940-941)
