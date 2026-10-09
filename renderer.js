@@ -161,10 +161,6 @@
       debugLog("Current mode before switch:", currentMode);
       applyMode(currentMode === 1 ? 2 : 1);
       debugLog("Current mode after switch:", currentMode);
-      // Notify main process of user interaction
-      if (window.SmootieAPI && window.SmootieAPI.islandInteraction) {
-        window.SmootieAPI.islandInteraction();
-      }
     }
   });
 
@@ -1064,10 +1060,9 @@
   loadRandomPhoto();
 
   // -------- WINDOW MAXIMIZATION DETECTION --------
-  let isWindowMaximized = false; // Always false - island always visible
+  let isWindowMaximized = false;
 
   // Update island visibility based on maximization state with debouncing
-  // Now a no-op since island is always visible
   let visibilityTimeout = null;
   function updateIslandVisibility() {
     // Clear any pending visibility update
@@ -1076,28 +1071,56 @@
       visibilityTimeout = null;
     }
 
-    // Island is always visible - don't hide it regardless of maximized state
-    debugLog("updateIslandVisibility called but island always visible");
+    // Debounce visibility changes to prevent flickering
+    visibilityTimeout = setTimeout(() => {
+      const nookTray = document.getElementById("mode-nook");
+      const clockMode = document.getElementById("mode-clock");
+
+      if (nookTray && clockMode) {
+        if (isWindowMaximized) {
+          nookTray.classList.add("mode-hidden");
+          clockMode.classList.add("mode-hidden");
+          debugLog("Island hidden: window maximized");
+        } else {
+          nookTray.classList.remove("mode-hidden");
+          clockMode.classList.remove("mode-hidden");
+          debugLog("Island shown: window not maximized");
+        }
+      }
+      visibilityTimeout = null;
+    }, 100); // 100ms debounce
   }
 
   if (window.SmootieAPI) {
-    // Island show/hide events are now disabled - island stays visible always
-    // Keeping the listeners for potential future use, but they won't affect visibility
+    // Island show/hide events
     if (window.SmootieAPI.onIslandHide) {
       window.SmootieAPI.onIslandHide(() => {
-        debugLog("Received island hide event (ignored - island always visible)");
-        // Don't change visibility - island stays visible
+        debugLog("Received island hide event");
+        isWindowMaximized = true;
+        updateIslandVisibility();
       });
     }
 
     if (window.SmootieAPI.onIslandShow) {
       window.SmootieAPI.onIslandShow(() => {
-        debugLog("Received island show event (ignored - island always visible)");
-        // Don't change visibility - island stays visible
+        debugLog("Received island show event");
+        isWindowMaximized = false;
+        updateIslandVisibility();
       });
     }
 
-    // Skip initial maximized state check - island always visible
-    debugLog("Island maximization detection disabled - island always visible");
+    // Check initial maximized state on startup
+    if (window.SmootieAPI.isWindowMaximized) {
+      window.SmootieAPI.isWindowMaximized().then((isMaximized) => {
+        debugLog("Initial maximized state check:", isMaximized);
+        isWindowMaximized = !!isMaximized;
+        updateIslandVisibility();
+      }).catch((error) => {
+        console.error("Error checking initial maximized state:", error);
+        // Default to showing island if we can't determine state
+        isWindowMaximized = false;
+        updateIslandVisibility();
+      });
+    }
   }
 })();

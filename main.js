@@ -50,7 +50,6 @@ let lastYouTubeWindowAtMs = 0;
 let lastIslandVisible = null;
 let hideTimer = null;
 let appStartupTime = Date.now();
-let lastInteractionTime = Date.now();
 
 function setIslandVisible(visible) {
   if (lastIslandVisible === visible) return;
@@ -937,15 +936,23 @@ async function checkVideoPlayback() {
     lastActiveWindowInfo = windowInfo || null;
     lastActiveWindowAtMs = Date.now();
 
-    // Fullscreen detection is now purely informational - does NOT affect island visibility
-    // The island remains visible regardless of fullscreen state
+    // Check if Screenpresso is the active window
+    const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
+    const title = (windowInfo?.title || "").toLowerCase();
+    const isScreenpressoActive = ownerName.includes('screenpresso') || title.includes('screenpresso');
+
+    // Fullscreen detection - but keep island visible if Screenpresso is active
     const timeSinceStartup = Date.now() - appStartupTime;
     if (timeSinceStartup > 3000) {
       const isAnyFullscreen = await isAnyWindowFullscreen();
-      // Just log the state, don't change visibility
-      if (lastMaximizedState === null || isAnyFullscreen !== lastMaximizedState) {
-        lastMaximizedState = isAnyFullscreen;
-        console.log("[fullscreen] State changed to:", isAnyFullscreen, "(informational only)");
+      
+      // Hide island if fullscreen AND Screenpresso is NOT active
+      const shouldHide = isAnyFullscreen && !isScreenpressoActive;
+      
+      if (lastMaximizedState === null || shouldHide !== lastMaximizedState) {
+        lastMaximizedState = shouldHide;
+        console.log("[fullscreen] State changed to:", shouldHide, isScreenpressoActive ? "(Screenpresso active - showing island)" : "");
+        setIslandVisible(!shouldHide);
       }
     }
     
@@ -1673,11 +1680,7 @@ function setupIpcHandlers() {
     }
   });
 
-  // Handle user interaction with island
-  ipcMain.on("island-interaction", () => {
-    lastInteractionTime = Date.now();
-    console.log("[Interaction] User interacted with island, skipping fullscreen detection for 2s");
-  });
+
 
   // Screenshot capture
   let recordingProcess = null;

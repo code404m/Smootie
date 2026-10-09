@@ -63,6 +63,14 @@ html, body {
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
+.clock-mode.mode-hidden {
+  display: none !important;
+}
+
+.nook-tray.mode-hidden {
+  display: none !important;
+}
+
 .clock-island {
   position: fixed !important;
   top: 0 !important;
