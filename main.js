@@ -840,7 +840,7 @@ async function isAnyWindowFullscreen() {
     const { stdout, stderr } = await execAsync(psScript, { shell: 'powershell.exe' });
     console.log("[Fullscreen Detection] PowerShell output:", stdout);
     if (stderr) console.log("[Fullscreen Detection] PowerShell stderr:", stderr);
-    return stdout.trim() === 'FULLSCREEN';
+    return /^FULLSCREEN\s*$/m.test(stdout);
   } catch (error) {
     console.error("Error checking fullscreen windows:", error.message);
     return false;
