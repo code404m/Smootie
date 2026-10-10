@@ -742,7 +742,7 @@ async function getActiveWindowInfo() {
 const fullscreenWatcher = require("./fullscreen-watcher");
 process.on("exit", () => fullscreenWatcher.stop());
 async function isAnyWindowFullscreen() {
-  if (isWindows) { fullscreenWatcher.start(); if (fullscreenWatcher.isReady()) return fullscreenWatcher.isFullscreen(); }
+  if (isWindows) { fullscreenWatcher.start(function (fs) { const show = !fs; if (lastMaximizedState !== show) { lastMaximizedState = show; console.log("[fullscreen] Instant state change:", show ? "SHOW" : "HIDE"); setIslandVisible(show); } }); if (fullscreenWatcher.isReady()) return fullscreenWatcher.isFullscreen(); }
   if (!isWindows) return false;
 
   try {
