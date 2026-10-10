@@ -739,7 +739,10 @@ async function getActiveWindowInfo() {
 }
 
 // Check if ANY window is maximized or fullscreen (not just the active one)
+const fullscreenWatcher = require("./fullscreen-watcher");
+process.on("exit", () => fullscreenWatcher.stop());
 async function isAnyWindowFullscreen() {
+  if (isWindows) { fullscreenWatcher.start(); if (fullscreenWatcher.isReady()) return fullscreenWatcher.isFullscreen(); }
   if (!isWindows) return false;
 
   try {
