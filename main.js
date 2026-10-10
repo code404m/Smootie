@@ -1,4 +1,4 @@
-// main.js
+﻿// main.js
 const { app, BrowserWindow, screen, ipcMain, desktopCapturer, nativeImage } = require("electron");
 const https = require("https");
 const path = require("path");
@@ -743,112 +743,94 @@ async function isAnyWindowFullscreen() {
   if (!isWindows) return false;
 
   try {
-    // Use PowerShell to get all visible windows and check their bounds and maximized state
+    // Enumerate ALL top-level windows (EnumWindows) instead of Get-Process/MainWindowHandle
     const psScript = `
       Add-Type -AssemblyName System.Windows.Forms
       Add-Type @"
       using System;
       using System.Runtime.InteropServices;
+      using System.Text;
       public class Win32 {
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetForegroundWindow();
-        
-        [DllImport("user32.dll")]
-        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        
-        [DllImport("user32.dll")]
-        public static extern bool IsWindowVisible(IntPtr hWnd);
-        
-        [DllImport("user32.dll")]
-        public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
-        
-        [DllImport("user32.dll")]
-        public static extern bool IsZoomed(IntPtr hWnd);
-        
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetShellWindow();
-        
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+        [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+        [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+        [DllImport("user32.dll")] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
+        [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int index);
+        [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int val, int size);
+
         [StructLayout(LayoutKind.Sequential)]
-        public struct RECT {
-          public int Left;
-          public int Top;
-          public int Right;
-          public int Bottom;
+        public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+        static bool IsIgnored(string t) {
+          if (t.Length == 0) return true;
+          string[] exact = { "Taskbar", "Start", "Search", "Program Manager", "Windows Input Experience", "Microsoft Text Input Application" };
+          foreach (string e in exact) {
+            if (string.Equals(t, e, StringComparison.OrdinalIgnoreCase)) return true;
+          }
+          string[] part = { "Desktop Window Manager", "TextInputHost" };
+          foreach (string p in part) {
+            if (t.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+          }
+          return false;
+        }
+
+        public static string FindFullscreen(uint ownPid, int sx, int sy, int sw, int sh) {
+          string found = "";
+          IntPtr shell = GetShellWindow();
+          EnumWindows(delegate(IntPtr h, IntPtr l) {
+            if (h == shell) return true;
+            if (!IsWindowVisible(h) || IsIconic(h)) return true;
+
+            uint pid = 0;
+            GetWindowThreadProcessId(h, out pid);
+            if (pid == ownPid) return true;
+
+            int cloaked = 0;
+            if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0) return true;
+            if ((GetWindowLong(h, -20) & 0x80) != 0) return true;
+
+            RECT r;
+            if (!GetWindowRect(h, out r)) return true;
+            int w = r.Right - r.Left;
+            int ht = r.Bottom - r.Top;
+            if (w < 400 || ht < 300) return true;
+
+            StringBuilder sb = new StringBuilder(256);
+            GetWindowText(h, sb, 256);
+            string title = sb.ToString();
+            if (IsIgnored(title)) return true;
+
+            bool maximized = IsZoomed(h);
+            bool covers = Math.Abs(r.Left - sx) <= 10 && Math.Abs(r.Top - sy) <= 10 && w >= sw - 20 && ht >= sh - 20;
+            if (maximized || covers) {
+              found = (maximized ? "maximized: " : "covers screen: ") + title + " (HWND: " + h.ToInt64() + ")";
+              return false;
+            }
+            return true;
+          }, IntPtr.Zero);
+          return found;
         }
       }
 "@
-      
+
       $primaryScreen = [System.Windows.Forms.Screen]::PrimaryScreen
       $screenWidth = $primaryScreen.Bounds.Width
       $screenHeight = $primaryScreen.Bounds.Height
       $screenX = $primaryScreen.Bounds.X
       $screenY = $primaryScreen.Bounds.Y
-      
+
       Write-Host "Screen bounds: X=$screenX, Y=$screenY, Width=$screenWidth, Height=$screenHeight"
-      
-      $fullscreenFound = $false
-      $shellWindow = [Win32]::GetShellWindow()
-      
-      $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
-      Write-Host "Checking $($process.Count) processes with windows"
-      
-      foreach ($p in $process) {
-        $hwnd = $p.MainWindowHandle
-        
-        # Skip the shell window (desktop) and very small windows
-        if ($hwnd -eq $shellWindow) { continue }
-        
-        $rect = New-Object Win32+RECT
-        if ([Win32]::GetWindowRect($hwnd, [ref]$rect) -and [Win32]::IsWindowVisible($hwnd)) {
-          $width = $rect.Right - $rect.Left
-          $height = $rect.Bottom - $rect.Top
-          
-          # Skip very small windows
-          if ($width -lt 400 -or $height -lt 300) { continue }
-          
-          # Get window title to exclude certain windows
-          $title = New-Object System.Text.StringBuilder 256
-          [Win32]::GetWindowText($hwnd, $title, 256) | Out-Null
-          $titleStr = $title.ToString()
-          
-          # Exclude Smootie/Electron windows and taskbar-related windows
-          if ($titleStr -match "Smootie|Electron" -or 
-              $titleStr -match "Taskbar|Start menu|Search" -or
-              $titleStr -match "Desktop Window Manager|DWM" -or
-              $titleStr -match "Windows Input Experience" -or
-              $titleStr -match "TextInputHost" -or
-              $titleStr -eq "") { 
-            continue 
-          }
-          
-          # Check if window is maximized using Windows API
-          $isMaximized = [Win32]::IsZoomed($hwnd)
-          
-          if ($isMaximized) {
-            $fullscreenFound = $true
-            Write-Host "Found maximized window: $($titleStr) (HWND: $hwnd)"
-            break
-          }
-          
-          # Also check if window covers the screen (fullscreen video/game)
-          # Use tolerance for position and size
-          $positionTolerance = 10
-          $sizeTolerance = 20
-          
-          $coversScreen = [Math]::Abs($rect.Left - $screenX) -le $positionTolerance -and
-                          [Math]::Abs($rect.Top - $screenY) -le $positionTolerance -and
-                          $width -ge ($screenWidth - $sizeTolerance) -and
-                          $height -ge ($screenHeight - $sizeTolerance)
-          
-          if ($coversScreen) {
-            $fullscreenFound = $true
-            Write-Host "Found fullscreen-covering window: $($titleStr) (Rect: $($rect.Left),$($rect.Top),$($width),$($height))"
-            break
-          }
-        }
-      }
-      
-      if ($fullscreenFound) {
+
+      $result = [Win32]::FindFullscreen([uint32]${process.pid}, $screenX, $screenY, $screenWidth, $screenHeight)
+
+      if ($result) {
+        Write-Host "Found $result"
         Write-Output "FULLSCREEN"
       } else {
         Write-Output "NOT_FULLSCREEN"
