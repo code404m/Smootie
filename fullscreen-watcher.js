@@ -1,4 +1,4 @@
-// Keeps ONE PowerShell running that checks windows ~10x/second.
+﻿// Keeps ONE PowerShell running that checks windows ~10x/second.
 // The app reads the latest answer instantly instead of starting PowerShell each time.
 const { spawn } = require('child_process');
 
@@ -86,7 +86,30 @@ while ($true) {
 `;
 }
 
+let pendingTimer = null;
+let pendingValue = null;
+
+// Only accept a changed answer if it stays the same for 200 ms (stops flicker)
 function handleLine(line) {
+  line = line.trim();
+  if (line === 'READY') { applyLine(line); return; }
+  if (!(line.startsWith('FULLSCREEN') || line === 'NOT_FULLSCREEN')) return;
+  const now = line.startsWith('FULLSCREEN');
+  if (now === fullscreen) {
+    if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; pendingValue = null; }
+    return;
+  }
+  if (pendingTimer && pendingValue === now) return;
+  if (pendingTimer) clearTimeout(pendingTimer);
+  pendingValue = now;
+  pendingTimer = setTimeout(() => {
+    pendingTimer = null;
+    pendingValue = null;
+    applyLine(line);
+  }, 200);
+}
+
+function applyLine(line) {
   line = line.trim();
   if (!line) return;
   if (line === 'READY') {
