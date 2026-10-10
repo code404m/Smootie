@@ -58,13 +58,15 @@ function setIslandVisible(visible) {
   if (win && !win.isDestroyed()) {
     // Actually show/hide the window
     if (visible) {
-      win.show();
+      
       // Ensure it's centered when showing
       const primary = screen.getPrimaryDisplay();
       const screenWidth = primary.bounds.width;
       const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
       const y = primary.bounds.y;
       win.setPosition(x, y);
+      win.showInactive();
+      win.setAlwaysOnTop(true, "screen-saver");
       console.log(`[Window] Window shown and repositioned to center: x=${x}, y=${y}`);
     } else {
       win.hide();
