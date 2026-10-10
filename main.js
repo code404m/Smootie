@@ -65,12 +65,15 @@ function setIslandVisible(visible) {
       const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
       const y = primary.bounds.y;
       win.setPosition(x, y);
-      win.showInactive();
+      win.setOpacity(1);
+      win.setIgnoreMouseEvents(false);
+      if (!win.isVisible()) win.showInactive();
       win.setAlwaysOnTop(true, "screen-saver");
       console.log(`[Window] Window shown and repositioned to center: x=${x}, y=${y}`);
     } else {
-      win.hide();
-      console.log("[Window] Window hidden");
+      win.setOpacity(0);
+      win.setIgnoreMouseEvents(true, { forward: true });
+      console.log("[Window] Window hidden (transparent)");
     }
     
     // Also send IPC message for renderer (in case it needs to know)
