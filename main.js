@@ -49,11 +49,45 @@ let lastYouTubeWindowInfo = null;
 let lastYouTubeWindowAtMs = 0;
 let lastIslandVisible = null;
 let hideTimer = null;
+let appStartupTime = Date.now();
 
 function setIslandVisible(visible) {
   if (lastIslandVisible === visible) return;
   lastIslandVisible = visible;
-  if (win && !win.isDestroyed()) win.webContents.send(visible ? "island-show" : "island-hide");
+  
+  if (win && !win.isDestroyed()) {
+    // Actually show/hide the window
+    if (visible) {
+      
+      // Ensure it's centered when showing
+      const primary = screen.getPrimaryDisplay();
+      const screenWidth = primary.bounds.width;
+      const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
+      const y = primary.bounds.y;
+      win.setPosition(x, y);
+      win.setOpacity(1);
+      win.setIgnoreMouseEvents(false);
+      if (!win.isVisible()) win.showInactive();
+      win.setAlwaysOnTop(true, "screen-saver");
+      console.log(`[Window] Window shown and repositioned to center: x=${x}, y=${y}`);
+    } else {
+      win.setOpacity(0);
+      win.setIgnoreMouseEvents(true, { forward: true });
+      console.log("[Window] Window hidden (transparent)");
+    }
+    
+    // Also send IPC message for renderer (in case it needs to know)
+    win.webContents.send(visible ? "island-show" : "island-hide");
+  }
+}
+
+// Island is always visible now - fullscreen detection is informational only
+function showIsland() {
+  setIslandVisible(true);
+}
+
+function hideIsland() {
+  setIslandVisible(false);
 }
 
 // Platform-specific process variables for media controls
@@ -67,11 +101,15 @@ let playbackCheckMs = 0;
 const PLAYBACK_CHECK_INTERVAL_MS = 1200;
 let lastMediaCommandAtMs = 0;
 const MEDIA_COMMAND_COOLDOWN_MS = 350;
-const IS_DEVELOPMENT = !app.isPackaged;
+let IS_DEVELOPMENT = null;
 
 function getStartupEnabled() {
   try {
     if (isWindows) {
+      if (!app.isReady()) {
+        console.log("[startup] App not ready yet, returning false");
+        return false;
+      }
       const settings = app.getLoginItemSettings();
       const enabled = !!settings?.openAtLogin;
       console.log("[startup] Current login settings:", settings);
@@ -397,71 +435,144 @@ function activateYouTubeAndSendKey(youtubeWindowTitle, youtubeProcessId, key) {
   const pid = Number.isFinite(Number(youtubeProcessId)) ? Number(youtubeProcessId) : null;
 
   if (isWindows) {
-    // Build a minimal, safe PowerShell script: try AppActivate by PID, then by title, then by generic 'YouTube'
-    const pidActivation = pid !== null
-      ? `
-        try { $activated = $shell.AppActivate(${pid}) } catch { $activated = $false }
-      `
-      : `
-        $activated = $false
-      `;
+    // Use Windows API to find and activate window by process ID (more reliable than AppActivate)
+    const ps = `Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
 
-    const titleActivation = escapedTitle
-      ? `
-        if (-not $activated -and '${escapedTitle}'.Length -gt 0) {
-          try { $activated = $shell.AppActivate('${escapedTitle}') } catch { }
-        }
-      `
-      : "";
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
 
-    const ps = `
-      Add-Type -AssemblyName System.Windows.Forms
-      $shell = New-Object -ComObject WScript.Shell
-      $activated = $false
-      ${pidActivation}
-      ${titleActivation}
-      if (-not $activated) {
-        try { $activated = $shell.AppActivate('YouTube') } catch { }
-      }
-      if (-not $activated) {
-        try { $activated = $shell.AppActivate('Google Chrome') } catch { }
-      }
-      if ($activated) {
-        Start-Sleep -Milliseconds 120
-        [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
-        Write-Host "[activateYouTubeAndSendKey] Sent key '${escapedKey}'"
-      } else {
-        Write-Host "[activateYouTubeAndSendKey] Could not activate a YouTube window"
-      }
-    `;
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
-    console.log("[activateYouTubeAndSendKey] Queuing PowerShell command");
-    queuePowerShellCommand(ps);
+  [DllImport("user32.dll")]
+  public static extern bool IsWindow(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr OpenThread(uint dwDesiredAccess, bool bInheritHandle, uint dwThreadId);
+
+  [DllImport("kernel32.dll")]
+  public static extern bool CloseHandle(IntPtr hObject);
+}
+"@
+
+$activated = $false
+$targetHwnd = 0
+
+${pid !== null ? `# Try to find window by process ID - just use MainWindowHandle directly
+$process = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
+if ($process) {
+  $mainWindow = $process.MainWindowHandle
+  if ($mainWindow -ne 0 -and [Win32]::IsWindow($mainWindow)) {
+    $targetHwnd = $mainWindow
+    Write-Host "Found window by PID: ${pid}, HWND: $mainWindow"
+  }
+}
+` : ''}
+
+# If PID method failed, try by title
+if ($targetHwnd -eq 0 -and '${escapedTitle}'.Length -gt 0) {
+  $shell = New-Object -ComObject WScript.Shell
+  $activated = $shell.AppActivate('${escapedTitle}')
+  if ($activated) {
+    Start-Sleep -Milliseconds 120
+    [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+    Write-Host "[activateYouTubeAndSendKey] Sent key '${escapedKey}' via title"
+    return
+  }
+}
+
+# If we have a valid HWND, activate it
+if ($targetHwnd -ne 0) {
+  # Check if this window is already foreground
+  $currentForeground = [Win32]::GetForegroundWindow()
+  if ($currentForeground -eq $targetHwnd) {
+    # Already focused, use media key (more reliable than SendKeys)
+    Start-Sleep -Milliseconds 50
+    ${key === 'k' ? `# Send Play/Pause media key (VK_MEDIA_PLAY_PAUSE = 0xB3)
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class KeySender {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+}
+"@
+[KeySender]::keybd_event(0xB3, 0, 0, 0)
+Start-Sleep -Milliseconds 50
+[KeySender]::keybd_event(0xB3, 0, 2, 0)
+Write-Host "[activateYouTubeAndSendKey] Window already focused, sent Play/Pause media key"
+` : `[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+Write-Host "[activateYouTubeAndSendKey] Window already focused, sent key '${escapedKey}'"
+`}
+  } else {
+    # Need to focus first
+    [Win32]::ShowWindow($targetHwnd, 9)  # SW_RESTORE
+    [Win32]::SetForegroundWindow($targetHwnd)
+    Start-Sleep -Milliseconds 200  # Increased delay to ensure focus is established
+    ${key === 'k' ? `# Send Play/Pause media key
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class KeySender {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, int dwFlags, int dwExtraInfo);
+}
+"@
+[KeySender]::keybd_event(0xB3, 0, 0, 0)
+Start-Sleep -Milliseconds 50
+[KeySender]::keybd_event(0xB3, 0, 2, 0)
+Write-Host "[activateYouTubeAndSendKey] Activated window and sent Play/Pause media key"
+` : `[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')
+Write-Host "[activateYouTubeAndSendKey] Activated window and sent key '${escapedKey}'"
+`}
+  }
+} else {
+  Write-Host "[activateYouTubeAndSendKey] Could not activate a YouTube window"
+}`;
+
+    console.log("[activateYouTubeAndSendKey] Executing immediately (bypassing queue)");
+    // Execute immediately instead of queuing to avoid delay
+    exec(ps, { shell: 'powershell.exe' }, (error, stdout, stderr) => {
+      if (error) console.error("[activateYouTubeAndSendKey] Error:", error);
+      if (stdout) console.log("[activateYouTubeAndSendKey] stdout:", stdout.trim());
+      if (stderr) console.error("[activateYouTubeAndSendKey] stderr:", stderr);
+    });
   } else if (isLinux) {
     // Linux: Use xdotool to find and activate YouTube window, then send key
-    const linuxCmd = `
-      # Try to find YouTube window by title
-      WINDOW_ID=$(xdotool search --name "${escapedTitle}" | head -1)
-      if [ -z "$WINDOW_ID" ]; then
-        # Try generic YouTube
-        WINDOW_ID=$(xdotool search --name "YouTube" | head -1)
-      fi
-      if [ -z "$WINDOW_ID" ]; then
-        # Try Chrome
-        WINDOW_ID=$(xdotool search --name "Google Chrome" | head -1)
-      fi
-      if [ -n "$WINDOW_ID" ]; then
-        xdotool windowactivate "$WINDOW_ID"
-        sleep 0.12
-        xdotool key "${escapedKey}"
-        echo "[activateYouTubeAndSendKey] Sent key '${escapedKey}' to window $WINDOW_ID"
-      else
-        echo "[activateYouTubeAndSendKey] Could not activate a YouTube window"
-      fi
-    `;
-    
-    console.log("[activateYouTubeAndSendKey] Queuing Linux command");
-    queuePowerShellCommand(linuxCmd);
+    const linuxCmd = `# Try to find YouTube window by title
+WINDOW_ID=$(xdotool search --name "${escapedTitle}" | head -1)
+if [ -z "$WINDOW_ID" ]; then
+  # Try generic YouTube
+  WINDOW_ID=$(xdotool search --name "YouTube" | head -1)
+fi
+if [ -z "$WINDOW_ID" ]; then
+  # Try Chrome
+  WINDOW_ID=$(xdotool search --name "Google Chrome" | head -1)
+fi
+if [ -n "$WINDOW_ID" ]; then
+  xdotool windowactivate "$WINDOW_ID"
+  sleep 0.12
+  xdotool key "${escapedKey}"
+  echo "[activateYouTubeAndSendKey] Sent key '${escapedKey}' to window $WINDOW_ID"
+else
+  echo "[activateYouTubeAndSendKey] Could not activate a YouTube window"
+fi`;
+
+    console.log("[activateYouTubeAndSendKey] Executing Linux command immediately");
+    exec(linuxCmd, { shell: 'bash' }, (error, stdout, stderr) => {
+      if (error) console.error("[activateYouTubeAndSendKey] Error:", error);
+      if (stdout) console.log("[activateYouTubeAndSendKey] stdout:", stdout.trim());
+      if (stderr) console.error("[activateYouTubeAndSendKey] stderr:", stderr);
+    });
   }
 }
 
@@ -497,9 +608,103 @@ function debugLog(...args) {
 
 const NOOK_WIDTH = 750;
 const NOOK_HEIGHT = 140;
-const SHADOW_PADDING = 60; // Extra space for shadow rendering
 
 // ---------------- VIDEO DETECTION (YouTube Only) ----------------
+
+// Helper function to find YouTube window among all windows (not just active)
+async function findYouTubeWindow() {
+  if (!isWindows) return null;
+
+  try {
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type @"
+      using System;
+      using System.Runtime.InteropServices;
+      public class Win32 {
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetShellWindow();
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT {
+          public int Left;
+          public int Top;
+          public int Right;
+          public int Bottom;
+        }
+      }
+"@
+
+      $shellWindow = [Win32]::GetShellWindow()
+      $process = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 }
+
+      foreach ($p in $process) {
+        $hwnd = $p.MainWindowHandle
+
+        # Skip the shell window (desktop) and very small windows
+        if ($hwnd -eq $shellWindow) { continue }
+
+        $rect = New-Object Win32+RECT
+        if ([Win32]::GetWindowRect($hwnd, [ref]$rect) -and [Win32]::IsWindowVisible($hwnd)) {
+          $width = $rect.Right - $rect.Left
+          $height = $rect.Bottom - $rect.Top
+
+          # Skip very small windows
+          if ($width -lt 400 -or $height -lt 300) { continue }
+
+          # Get window title
+          $title = New-Object System.Text.StringBuilder 256
+          [Win32]::GetWindowText($hwnd, $title, 256) | Out-Null
+          $titleStr = $title.ToString()
+
+          # Check if title contains "YouTube"
+          if ($titleStr -match "YouTube") {
+            Write-Output "FOUND|$($titleStr)|$($p.Id)"
+            return
+          }
+        }
+      }
+
+      Write-Output "NOT_FOUND"
+    `;
+
+    const { stdout } = await execAsync(psScript, { shell: 'powershell.exe' });
+    const output = stdout.trim();
+
+    if (output.startsWith("FOUND|")) {
+      const parts = output.split("|");
+      const title = parts[1];
+      const processId = parseInt(parts[2], 10);
+      console.log("[YouTube Window Search] Found YouTube window:", title, "PID:", processId);
+      return {
+        title: title,
+        owner: { name: "Browser", processId: processId },
+        url: "" // URL not available from title-only check
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error searching for YouTube window:", error.message);
+    return null;
+  }
+}
+
 function computeIsMaximized(windowBounds, screenBounds) {
   let positionTolerance, sizeTolerance;
 
@@ -536,6 +741,118 @@ async function getActiveWindowInfo() {
     }
   }
   return activeWindowFn();
+}
+
+// Check if ANY window is maximized or fullscreen (not just the active one)
+const fullscreenWatcher = require("./fullscreen-watcher");
+process.on("exit", () => fullscreenWatcher.stop());
+async function isAnyWindowFullscreen() {
+  if (isWindows) { fullscreenWatcher.start(function (fs) { const show = !fs; if (lastMaximizedState !== show) { lastMaximizedState = show; console.log("[fullscreen] Instant state change:", show ? "SHOW" : "HIDE"); setIslandVisible(show); } }); if (fullscreenWatcher.isReady()) return fullscreenWatcher.isFullscreen(); }
+  if (!isWindows) return false;
+
+  try {
+    // Enumerate ALL top-level windows (EnumWindows) instead of Get-Process/MainWindowHandle
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type @"
+      using System;
+      using System.Runtime.InteropServices;
+      using System.Text;
+      public class Win32 {
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+        [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+        [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+        [DllImport("user32.dll")] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
+        [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int index);
+        [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int val, int size);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+        static bool IsIgnored(string t) {
+          if (t.Length == 0) return true;
+          string[] exact = { "Taskbar", "Start", "Search", "Program Manager", "Windows Input Experience", "Microsoft Text Input Application" };
+          foreach (string e in exact) {
+            if (string.Equals(t, e, StringComparison.OrdinalIgnoreCase)) return true;
+          }
+          string[] part = { "Desktop Window Manager", "TextInputHost" };
+          foreach (string p in part) {
+            if (t.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+          }
+          return false;
+        }
+
+        public static string FindFullscreen(uint ownPid, int sx, int sy, int sw, int sh) {
+          string found = "";
+          IntPtr shell = GetShellWindow();
+          EnumWindows(delegate(IntPtr h, IntPtr l) {
+            if (h == shell) return true;
+            if (!IsWindowVisible(h) || IsIconic(h)) return true;
+
+            uint pid = 0;
+            GetWindowThreadProcessId(h, out pid);
+            if (pid == ownPid) return true;
+
+            int cloaked = 0;
+            if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0) return true;
+            if ((GetWindowLong(h, -20) & 0x80) != 0) return true;
+
+            RECT r;
+            if (!GetWindowRect(h, out r)) return true;
+            int w = r.Right - r.Left;
+            int ht = r.Bottom - r.Top;
+            if (w < 400 || ht < 300) return true;
+
+            StringBuilder sb = new StringBuilder(256);
+            GetWindowText(h, sb, 256);
+            string title = sb.ToString();
+            if (IsIgnored(title)) return true;
+
+            bool maximized = IsZoomed(h);
+            bool covers = Math.Abs(r.Left - sx) <= 10 && Math.Abs(r.Top - sy) <= 10 && w >= sw - 20 && ht >= sh - 20;
+            if (maximized || covers) {
+              found = (maximized ? "maximized: " : "covers screen: ") + title + " (HWND: " + h.ToInt64() + ")";
+              return false;
+            }
+            return true;
+          }, IntPtr.Zero);
+          return found;
+        }
+      }
+"@
+
+      $primaryScreen = [System.Windows.Forms.Screen]::PrimaryScreen
+      $screenWidth = $primaryScreen.Bounds.Width
+      $screenHeight = $primaryScreen.Bounds.Height
+      $screenX = $primaryScreen.Bounds.X
+      $screenY = $primaryScreen.Bounds.Y
+
+      Write-Host "Screen bounds: X=$screenX, Y=$screenY, Width=$screenWidth, Height=$screenHeight"
+
+      $result = [Win32]::FindFullscreen([uint32]${process.pid}, $screenX, $screenY, $screenWidth, $screenHeight)
+
+      if ($result) {
+        Write-Host "Found $result"
+        Write-Output "FULLSCREEN"
+      } else {
+        Write-Output "NOT_FULLSCREEN"
+      }
+    `;
+
+    const { stdout, stderr } = await execAsync(psScript, { shell: 'powershell.exe' });
+    console.log("[Fullscreen Detection] PowerShell output:", stdout);
+    if (stderr) console.log("[Fullscreen Detection] PowerShell stderr:", stderr);
+    return /^FULLSCREEN\s*$/m.test(stdout);
+  } catch (error) {
+    console.error("Error checking fullscreen windows:", error.message);
+    return false;
+  }
 }
 
 // Linux active window detection using xdotool
@@ -832,42 +1149,57 @@ async function checkVideoPlayback() {
   if (isVideoCheckRunning) return;
   isVideoCheckRunning = true;
   try {
-    // Dynamic import for ES module - use activeWindow export
-    const windowInfo = await getActiveWindowInfo();
+    // First, try to find YouTube in ALL windows (not just active)
+    // This handles the case where YouTube is already open before Smootie starts
+    let windowInfo = await findYouTubeWindow();
+
+    // If no YouTube found in all windows, fall back to active window check
+    if (!windowInfo) {
+      windowInfo = await getActiveWindowInfo();
+    }
 
     lastActiveWindowInfo = windowInfo || null;
     lastActiveWindowAtMs = Date.now();
 
-    let isMaximized = false;
-    if (windowInfo?.bounds) {
-      const primaryDisplay = screen.getPrimaryDisplay();
-      isMaximized = computeIsMaximized(windowInfo.bounds, primaryDisplay.bounds);
-
-      // Always update island visibility based on current maximized state
-      setIslandVisible(!isMaximized);
-
-      // Still track state changes for debugging/logging
-      if (lastMaximizedState === null || isMaximized !== lastMaximizedState) {
-        lastMaximizedState = isMaximized;
-        console.log("[maximized] State changed to:", isMaximized);
-      }
-    } else {
-      // No window bounds available, assume not maximized and show island
-      setIslandVisible(true);
-      if (lastMaximizedState !== false) {
-        lastMaximizedState = false;
-        console.log("[maximized] No window bounds, assuming not maximized");
-      }
-    }
-    
-    // Check if it's a browser window (has URL) or known browser
+    // Check if Screenpresso is the active window
     const ownerName = (windowInfo?.owner?.name || "").toLowerCase();
     const title = (windowInfo?.title || "").toLowerCase();
+    const isScreenpressoActive = ownerName.includes('screenpresso') || title.includes('screenpresso');
+
+    // Debug logging to see what's detected
+    console.log("[Window Detection] ownerName:", ownerName, "title:", title, "isScreenpressoActive:", isScreenpressoActive);
+
+    // If Screenpresso is active, ALWAYS show the island and skip fullscreen logic completely
+    if (isScreenpressoActive) {
+      if (lastMaximizedState !== true) {
+        lastMaximizedState = true;
+        console.log("[Screenpresso] Active - forcing island to show for screenshots");
+        setIslandVisible(true);
+      }
+      return; // Skip all other logic when Screenpresso is active
+    }
+
+    // Normal fullscreen detection (only when Screenpresso is NOT active)
+    const timeSinceStartup = Date.now() - appStartupTime;
+    if (timeSinceStartup > 3000) {
+      const isAnyFullscreen = await isAnyWindowFullscreen();
+
+      const shouldShow = !isAnyFullscreen;
+
+      if (lastMaximizedState === null || shouldShow !== lastMaximizedState) {
+        lastMaximizedState = shouldShow;
+        console.log("[fullscreen] State changed to:", shouldShow ? "SHOW" : "HIDE");
+        setIslandVisible(shouldShow);
+      }
+    }
+
+    // Check if it's a browser window (has URL) or known browser
+    // ownerName and title are already declared above (line 940-941)
     const url = (windowInfo?.url || "").toLowerCase();
-    
+
     // Any window with a URL is likely a browser, plus check known browsers
-    const isBrowser = (url && url.length > 0) || 
-                     ownerName.includes('chrome') || ownerName.includes('edge') || 
+    const isBrowser = (url && url.length > 0) ||
+                     ownerName.includes('chrome') || ownerName.includes('edge') ||
                      ownerName.includes('firefox') || ownerName.includes('brave') ||
                      ownerName.includes('opera') || ownerName.includes('safari') ||
                      ownerName.includes('vivaldi') || ownerName.includes('arc') ||
@@ -937,6 +1269,15 @@ async function checkVideoPlayback() {
       win.videoUpdateTimeout = null;
     }, 50);
   }
+
+        // When YouTube video is detected, assume it's playing (auto-play behavior)
+        // This ensures the button shows PAUSE icon when YouTube is detected
+        if (videoInfo.source === "youtube" && lastPlaybackState !== 'playing') {
+          lastPlaybackState = 'playing';
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("update-playback-state", 'playing');
+          }
+        }
       }
 
       if (videoInfo.source === "youtube" && (!videoInfo.thumbnail || videoInfo.videoId === "detected")) {
@@ -1012,8 +1353,8 @@ function startVideoDetection() {
   checkVideoPlayback();
   startPlaybackStatePolling();
   // Then check frequently so maximization changes are detected quickly
-  // 280ms is a good balance between responsiveness and CPU usage
-  videoDetectionInterval = setInterval(checkVideoPlayback, 280);
+  // 100ms for faster YouTube detection
+  videoDetectionInterval = setInterval(checkVideoPlayback, 100);
 }
 
 function stopVideoDetection() {
@@ -1171,17 +1512,12 @@ function createWindow() {
   const screenWidth = primary.bounds.width;
   const screenY = primary.bounds.y || 0;
 
-  // Make window larger to accommodate shadow
-  const windowWidth = NOOK_WIDTH + (SHADOW_PADDING * 2);
-  const windowHeight = NOOK_HEIGHT + SHADOW_PADDING;
-
-  // Offset position to keep island visually centered
-  const x = Math.round(primary.bounds.x + (screenWidth - windowWidth) / 2);
+  const x = Math.round(primary.bounds.x + (screenWidth - NOOK_WIDTH) / 2);
   const y = primary.bounds.y; // Always at the very top of the screen
 
-  win = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
+  win = new BrowserWindow({ movable: false,
+    width: NOOK_WIDTH,
+    height: NOOK_HEIGHT,
     x, y,
     frame: false,
     transparent: true,
@@ -1218,10 +1554,8 @@ function createWindow() {
 
   win.webContents.on("did-finish-load", () => {
     setTimeout(() => {
-      win.showInactive();
+      { const d = screen.getPrimaryDisplay(); win.setBounds({ x: Math.round(d.bounds.x + (d.bounds.width - NOOK_WIDTH) / 2), y: d.bounds.y, width: NOOK_WIDTH, height: NOOK_HEIGHT }); win.showInactive(); }
       console.log('[Window] Window shown, re-applying display affinity');
-      // Make transparent areas click-through
-      win.setIgnoreMouseEvents(true, { forward: true });
       // Set window to be excluded from screen capture on Windows
       // This keeps the island visible to the user but excludes it from screenshots
       if (isWindows) {
@@ -1230,7 +1564,7 @@ function createWindow() {
     }, 80);
   });
 
-  setTimeout(() => win.setPosition(x, y), 150);
+  setTimeout(() => { const d = screen.getPrimaryDisplay(); win.setPosition(Math.round(d.bounds.x + (d.bounds.width - NOOK_WIDTH) / 2), d.bounds.y); }, 150);
   
   // Log all windows periodically for debugging
   setInterval(() => {
@@ -1298,7 +1632,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_PLAY_PAUSE");
       }
     } catch (error) {
-      console.error("Error controlling video playback:", error.message);
+      console.error("[IPC] Error controlling video playback:", error.message);
     }
   });
 
@@ -1341,7 +1675,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_NEXT_TRACK");
       }
     } catch (error) {
-      console.error("Error controlling next video:", error.message);
+      console.error("[IPC] Error controlling next video:", error.message);
     }
   });
 
@@ -1384,7 +1718,7 @@ function setupIpcHandlers() {
         sendMediaKeyCommand("MEDIA_PREV_TRACK");
       }
     } catch (error) {
-      console.error("Error controlling previous video:", error.message);
+      console.error("[IPC] Error controlling previous video:", error.message);
     }
   });
 
@@ -1566,7 +1900,6 @@ function setupIpcHandlers() {
         hideTimer = null;
         win.showInactive();
         win.setAlwaysOnTop(true, "screen-saver");
-        win.setIgnoreMouseEvents(true, { forward: true });
         console.log("Window shown, alwaysOnTop re-enabled");
       } catch (error) {
         console.error("Error showing window:", error);
@@ -1582,19 +1915,17 @@ function setupIpcHandlers() {
     app.quit();
   });
 
-  // Check if any window is maximized using active-win package
+  // Check if any window is maximized using new fullscreen detection
   ipcMain.handle("is-window-maximized", async () => {
     try {
-      const mod = await import("active-win");
-      const activeWindow = await mod.activeWindow();
-      if (!activeWindow?.bounds) return false;
-      const primaryDisplay = screen.getPrimaryDisplay();
-      return computeIsMaximized(activeWindow.bounds, primaryDisplay.bounds);
+      return await isAnyWindowFullscreen();
     } catch (error) {
       console.error("Error checking maximized state:", error.message);
       return false;
     }
   });
+
+
 
   // Screenshot capture
   let recordingProcess = null;

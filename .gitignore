@@ -58,3 +58,7 @@ electron.exe
 # *.jpeg
 # *.svg
 # *.ico
+
+# Local backups
+*.bak
+*.bak2

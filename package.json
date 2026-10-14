@@ -1,6 +1,6 @@
 {
   "name": "smootie",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -19,6 +19,7 @@
       "output": "dist"
     },
     "files": [
+      "fullscreen-watcher.js",
       "main.js",
       "preload.js",
       "renderer.js",
@@ -27,6 +28,7 @@
       "smootie album .jpeg",
       "island-mask.png",
       "island-mask.svg",
+      "album-art.png",
       "node_modules/**/*",
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",

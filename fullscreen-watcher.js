@@ -1,0 +1,200 @@
+﻿// Keeps ONE PowerShell running that checks windows ~25x/second.
+// The C# helper is compiled once into a cached DLL, so later launches start fast.
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+let proc = null;
+let stopped = false;
+let ready = false;
+let fullscreen = false;
+let buffer = '';
+let onChangeCb = null;
+
+const HELPER_VERSION = 'v1'; // bump this if the C# code below ever changes
+
+function getDllPath() {
+  let base;
+  try {
+    base = path.join(require('electron').app.getPath('userData'), 'watcher-cache');
+    fs.mkdirSync(base, { recursive: true });
+  } catch (e) {
+    base = path.join(os.tmpdir(), 'smootie-watcher-cache');
+    try { fs.mkdirSync(base, { recursive: true }); } catch (e2) {}
+  }
+  return path.join(base, 'SmootieWin-' + HELPER_VERSION + '.dll');
+}
+
+function buildScript(ownPid, dllPath) {
+  const dll = dllPath.replace(/'/g, "''");
+  return `
+Add-Type -AssemblyName System.Windows.Forms
+$dll = '${dll}'
+$src = @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class SmootieWin {
+  public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+  [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
+  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int index);
+  [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int val, int size);
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+  static bool IsIgnored(string t) {
+    if (t.Length == 0) return true;
+    string[] exact = { "Taskbar", "Start", "Search", "Program Manager", "Windows Input Experience", "Microsoft Text Input Application" };
+    foreach (string e in exact) { if (string.Equals(t, e, StringComparison.OrdinalIgnoreCase)) return true; }
+    string[] part = { "Desktop Window Manager", "TextInputHost" };
+    foreach (string p in part) { if (t.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0) return true; }
+    return false;
+  }
+
+  public static string FindFullscreen(uint ownPid, int sx, int sy, int sw, int sh) {
+    string found = "";
+    IntPtr shell = GetShellWindow();
+    EnumWindows(delegate(IntPtr h, IntPtr l) {
+      if (h == shell) return true;
+      if (!IsWindowVisible(h) || IsIconic(h)) return true;
+      uint pid = 0;
+      GetWindowThreadProcessId(h, out pid);
+      if (pid == ownPid) return true;
+      int cloaked = 0;
+      if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0) return true;
+      if ((GetWindowLong(h, -20) & 0x80) != 0) return true;
+      RECT r;
+      if (!GetWindowRect(h, out r)) return true;
+      int w = r.Right - r.Left;
+      int ht = r.Bottom - r.Top;
+      if (w < 400 || ht < 300) return true;
+      StringBuilder sb = new StringBuilder(256);
+      GetWindowText(h, sb, 256);
+      string title = sb.ToString();
+      if (IsIgnored(title)) return true;
+      bool maximized = IsZoomed(h);
+      bool covers = Math.Abs(r.Left - sx) <= 10 && Math.Abs(r.Top - sy) <= 10 && w >= sw - 20 && ht >= sh - 20;
+      if (maximized || covers) {
+        found = (maximized ? "maximized: " : "covers screen: ") + title;
+        return false;
+      }
+      return true;
+    }, IntPtr.Zero);
+    return found;
+  }
+}
+"@
+
+$loaded = $false
+try {
+  if (-not (Test-Path $dll)) {
+    $tmp = $dll + '.tmp'
+    Add-Type -TypeDefinition $src -OutputAssembly $tmp -OutputType Library
+    Move-Item -Force $tmp $dll
+  }
+  Add-Type -Path $dll
+  $loaded = $true
+} catch { }
+if (-not $loaded) { Add-Type -TypeDefinition $src }
+
+$s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+[Console]::Out.WriteLine("READY")
+$last = ""
+while ($true) {
+  $r = [SmootieWin]::FindFullscreen([uint32]${ownPid}, $s.X, $s.Y, $s.Width, $s.Height)
+  if ($r) { $cur = "FULLSCREEN|" + $r } else { $cur = "NOT_FULLSCREEN" }
+  if ($cur -ne $last) { [Console]::Out.WriteLine($cur); $last = $cur }
+  Start-Sleep -Milliseconds 40
+}
+`;
+}
+
+let pendingTimer = null;
+let pendingValue = null;
+
+// Hide is applied immediately; show waits 150 ms (stops flicker)
+function handleLine(line) {
+  line = line.trim();
+  if (line === 'READY') { applyLine(line); return; }
+  if (!(line.startsWith('FULLSCREEN') || line === 'NOT_FULLSCREEN')) return;
+  const now = line.startsWith('FULLSCREEN');
+  if (now === fullscreen) {
+    if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; pendingValue = null; }
+    return;
+  }
+  if (pendingTimer && pendingValue === now) return;
+  if (pendingTimer) clearTimeout(pendingTimer);
+  pendingValue = now;
+  pendingTimer = setTimeout(() => {
+    pendingTimer = null;
+    pendingValue = null;
+    applyLine(line);
+  }, now ? 0 : 150);
+}
+
+function applyLine(line) {
+  line = line.trim();
+  if (!line) return;
+  if (line === 'READY') {
+    ready = true;
+    console.log('[Watcher] Ready');
+    return;
+  }
+  if (line.startsWith('FULLSCREEN') || line === 'NOT_FULLSCREEN') {
+    const now = line.startsWith('FULLSCREEN');
+    const detail = line.includes('|') ? line.split('|')[1] : '';
+    const changed = now !== fullscreen;
+    fullscreen = now;
+    if (changed) {
+      console.log('[Watcher] State:', now ? 'FULLSCREEN (' + detail + ')' : 'NOT_FULLSCREEN');
+      if (onChangeCb) {
+        try { onChangeCb(now); } catch (e) { console.error('[Watcher] callback error:', e.message); }
+      }
+    }
+  }
+}
+
+function start(onChange) {
+  if (process.platform !== 'win32' || proc) return;
+  stopped = false;
+  onChangeCb = onChange || null;
+  const dllPath = getDllPath();
+  console.log('[Watcher] Helper DLL:', dllPath, fs.existsSync(dllPath) ? '(cached)' : '(will compile now)');
+  const encoded = Buffer.from(buildScript(process.pid, dllPath), 'utf16le').toString('base64');
+  proc = spawn('powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+    { windowsHide: true });
+  proc.stdout.on('data', (chunk) => {
+    buffer += chunk.toString();
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop();
+    lines.forEach(handleLine);
+  });
+  proc.stderr.on('data', (d) => console.error('[Watcher] stderr:', d.toString().trim()));
+  proc.on('exit', () => {
+    proc = null;
+    ready = false;
+    if (!stopped) setTimeout(() => start(onChangeCb), 2000);
+  });
+}
+
+function stop() {
+  stopped = true;
+  if (proc) { try { proc.kill(); } catch (e) {} proc = null; }
+  ready = false;
+}
+
+module.exports = {
+  start,
+  stop,
+  isReady: () => ready,
+  isFullscreen: () => fullscreen
+};

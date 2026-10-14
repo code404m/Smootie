@@ -7,20 +7,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Container for shadow space -->
-    <div class="window-container">
-        <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
-        <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
-            <div class="clock-island">
-                <div class="clock-inner">
-                    <div class="clock-time" id="clock-time">11:53:55</div>
-                    <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
-                </div>
+    <!-- Mode 1: Clock Only (Dynamic Island) - Outside draggable container -->
+    <div class="clock-mode" id="mode-clock" aria-label="Clock mode">
+        <div class="clock-island">
+            <div class="clock-inner">
+                <div class="clock-time" id="clock-time">11:53:55</div>
+                <div class="clock-date" id="clock-date">Fri, 12 Jan</div>
             </div>
         </div>
+    </div>
 
-        <!-- Mode 2: Original Nook Tray Widget -->
-        <div class="nook-tray" id="mode-nook">
+    <!-- Mode 2: Original Nook Tray Widget -->
+    <div class="nook-tray" id="mode-nook">
         <!-- Top Bar -->
         <div class="nook-top-bar">
             <div class="nook-tabs" role="tablist" aria-label="Smootie Tabs">
@@ -82,7 +80,7 @@
             <div class="nook-music">
                 <div class="music-content">
                     <div class="album-art" id="album-art">
-                        <img src="" alt="" id="album-art-img" style="display: none;">
+                        <img src="album-art.png" alt="" id="album-art-img" style="display: block;">
                         <div class="album-badge" aria-hidden="true">
                             <svg class="svg-icon" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7L8 5Z" />
@@ -150,11 +148,10 @@
             <!-- Right Section: Profile -->
             <div class="nook-profile">
                 <div class="profile-picture" id="profile-picture" style="cursor: pointer;">
-                    <img src="" alt="Profile" id="profile-img" style="display: none;">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E" alt="Profile" id="profile-img" style="display: block;">
                 </div>
             </div>
         </div>
-    </div>
     </div>
 
     <script src="renderer.js"></script>

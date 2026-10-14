@@ -111,7 +111,7 @@ The app creates a `.desktop` file in `~/.config/autostart/` for automatic startu
 - **Photos**: Click profile picture to select custom photo folder
 - **Position**: Widget automatically positions at top-center of screen
 
-## 🐛 Bug Reports (send me the report to code404m@gmail.com)
+## 🐛 Bug Reports (send me the report to pink.exe7@gmail.com)
 
 Please report issues with:
 - Operating system and version

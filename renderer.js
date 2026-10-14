@@ -8,7 +8,7 @@
   let lastGoodThumbnailUrl = null;
   let lastVideoDetectedAt = 0;
   let lastVideoCheckRequestAt = 0;
-  const DEFAULT_ALBUM_ART = "smootie album .jpeg";
+  const DEFAULT_ALBUM_ART = "album-art.png";
   const VIDEO_INFO_GRACE_MS = 4000;
   const VIDEO_CHECK_COOLDOWN_MS = 500;
 
@@ -20,11 +20,13 @@
   // -------- MODE SWITCHING (M key) --------
   let clockModeEl = null;
   let nookModeEl = null;
+  let nookContent = null;
 
   function initializeModeElements() {
     clockModeEl = document.getElementById("mode-clock");
     nookModeEl = document.getElementById("mode-nook");
-    debugLog("Mode elements found:", { clockModeEl: !!clockModeEl, nookModeEl: !!nookModeEl });
+    nookContent = document.querySelector(".nook-content");
+    debugLog("Mode elements found:", { clockModeEl: !!clockModeEl, nookModeEl: !!nookModeEl, nookContent: !!nookContent });
   }
 
   function applyMode(mode) {
@@ -40,16 +42,31 @@
         clockModeEl.classList.add("mode-hidden");
         nookModeEl.classList.remove("mode-hidden");
         debugLog("Switched to Mode 2 (Nook)");
+        debugLog("Current video info cached:", currentVideoInfo ? currentVideoInfo.title : "none");
 
-        // Always trigger a fresh video detection when entering Mode 2
-        if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
-          window.SmootieAPI.requestVideoCheck();
+        // Update video info immediately if we have it cached
+        if (currentVideoInfo) {
+          debugLog("Updating video info for Mode 2 from cache:", currentVideoInfo.title);
+          updateVideoInfoImmediate(currentVideoInfo);
+        } else {
+          debugLog("No cached video info, requesting fresh check");
         }
 
-        // Update video info immediately if we have it
-        if (currentVideoInfo) {
-          debugLog("Updating video info for Mode 2:", currentVideoInfo.title);
-          updateVideoInfo(currentVideoInfo);
+        // Always trigger a fresh video detection when entering Mode 2 (with slight delay)
+        // Request multiple times to ensure detection
+        if (window.SmootieAPI && window.SmootieAPI.requestVideoCheck) {
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (1)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 100);
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (2)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 300);
+          setTimeout(() => {
+            debugLog("Requesting fresh video check for Mode 2 (3)");
+            window.SmootieAPI.requestVideoCheck();
+          }, 600);
         }
       }
     } else {
@@ -84,61 +101,61 @@
     }
   });
 
-  // Click on black background to switch to Mode 1 (but not on interactive elements)
-  document.addEventListener("click", (e) => {
-    // Only switch to Mode 1 if we're currently in Mode 2 (nook mode)
-    if (currentMode !== 2) return;
-    
-    // Check if the clicked element or its parents are interactive
-    const target = e.target;
-    const interactiveSelectors = [
-      'button', 
-      '.music-control-btn', 
-      '.top-icon', 
-      '.nook-tab',
-      '.menu-item',
-      'input',
-      'select',
-      'textarea',
-      'a',
-      '[role="button"]',
-      '.clickable',
-      '.svg-icon',
-      '.tab-icon',
-      'svg',
-      'path',
-      '.nook-label',
-      '.tray-label',
-      '.song-title',
-      '.album-label',
-      '.artist-name',
-      '.clock-time',
-      '.clock-date'
-    ];
-    
-    // Check if the clicked element or any of its parents match interactive selectors
-    let isInteractive = false;
-    let element = target;
-    while (element && element !== document.body) {
-      if (interactiveSelectors.some(selector => element.matches?.(selector))) {
-        isInteractive = true;
-        break;
-      }
-      element = element.parentElement;
-    }
-    
-    // Only switch to Mode 1 if the click was on a non-interactive element
-    if (!isInteractive) {
-      // Check if we're clicking on the actual background (black areas)
-      const computedStyle = window.getComputedStyle(target);
-      const backgroundColor = computedStyle.backgroundColor;
-      
-      // Switch to Mode 1 if clicking on black/dark background
-      if (backgroundColor && (backgroundColor === 'rgb(0, 0, 0)' || backgroundColor === '#000000' || backgroundColor.includes('rgb(0, 0, 0)'))) {
-        applyMode(1);
-      }
-    }
-  });
+  // DISABLED: Click on black background to switch to Mode 1 (was causing accidental mode switches)
+  // document.addEventListener("click", (e) => {
+  //   // Only switch to Mode 1 if we're currently in Mode 2 (nook mode)
+  //   if (currentMode !== 2) return;
+  //   
+  //   // Check if the clicked element or its parents are interactive
+  //   const target = e.target;
+  //   const interactiveSelectors = [
+  //     'button', 
+  //     '.music-control-btn', 
+  //     '.top-icon', 
+  //     '.nook-tab',
+  //     '.menu-item',
+  //     'input',
+  //     'select',
+  //     'textarea',
+  //     'a',
+  //     '[role="button"]',
+  //     '.clickable',
+  //     '.svg-icon',
+  //     '.tab-icon',
+  //     'svg',
+  //     'path',
+  //     '.nook-label',
+  //     '.tray-label',
+  //     '.song-title',
+  //     '.album-label',
+  //     '.artist-name',
+  //     '.clock-time',
+  //     '.clock-date'
+  //   ];
+  //   
+  //   // Check if the clicked element or any of its parents match interactive selectors
+  //   let isInteractive = false;
+  //   let element = target;
+  //   while (element && element !== document.body) {
+  //     if (interactiveSelectors.some(selector => element.matches?.(selector))) {
+  //       isInteractive = true;
+  //       break;
+  //     }
+  //     element = element.parentElement;
+  //   }
+  //   
+  //   // Only switch to Mode 1 if the click was on a non-interactive element
+  //   if (!isInteractive) {
+  //     // Check if we're clicking on the actual background (black areas)
+  //     const computedStyle = window.getComputedStyle(target);
+  //     const backgroundColor = computedStyle.backgroundColor;
+  //     
+  //     // Switch to Mode 1 if clicking on black/dark background
+  //     if (backgroundColor && (backgroundColor === 'rgb(0, 0, 0)' || backgroundColor === '#000000' || backgroundColor.includes('rgb(0, 0, 0)'))) {
+  //       applyMode(1);
+  //     }
+  //   }
+  // });
 
   // Multiple switching options
   window.addEventListener("keydown", (e) => {
@@ -153,38 +170,72 @@
     }
   });
 
-  // Click on clock island to switch (single click)
+  // Click on clock island to switch to Mode 2 (single click)
   document.addEventListener("click", (e) => {
     if (clockModeEl && clockModeEl.contains(e.target)) {
-      debugLog("Clock island clicked, switching mode");
-      e.stopPropagation(); // Prevent double-click detection
-      applyMode(currentMode === 1 ? 2 : 1);
+      debugLog("Clock island clicked, switching to Mode 2");
+      e.stopPropagation();
+      debugLog("Current mode before switch:", currentMode);
+      applyMode(2);
+      debugLog("Current mode after switch:", currentMode);
     }
   });
 
-  // Double-click anywhere else (not on clock island) to switch
-  let lastClickTime = 0;
-  let lastClickTarget = null;
+  // Click on nook island background to switch back to Mode 1 (single click)
+  function setupNookClickHandler() {
+    if (!nookContent) {
+      nookContent = document.querySelector(".nook-content");
+    }
+    
+    if (nookContent) {
+      nookContent.addEventListener("click", (e) => {
+        if (currentMode === 2) {
+          // Check if clicking on interactive elements
+          const interactiveSelectors = [
+            'button',
+            '.music-control-btn',
+            '#play-btn',
+            '#prev-btn',
+            '#next-btn',
+            '.album-art',
+            '.profile-picture',
+            '.calendar-events-icon',
+            'input',
+            'select',
+            'textarea',
+            'a',
+            '[role="button"]',
+            '.clickable'
+          ];
+          
+          let isInteractive = false;
+          let element = e.target;
+          while (element && element !== nookContent) {
+            if (interactiveSelectors.some(selector => element.matches?.(selector))) {
+              isInteractive = true;
+              console.log("[Nook Click] Click on interactive element detected:", element);
+              break;
+            }
+            element = element.parentElement;
+          }
+          
+          // Only switch to Mode 1 if clicking on non-interactive background
+          if (!isInteractive) {
+            debugLog("Nook content background clicked, switching to Mode 1");
+            e.stopPropagation();
+            applyMode(1);
+          }
+        }
+      });
+    }
+  }
   
-  document.addEventListener("click", (e) => {
-    // Don't trigger double-click if clicking on clock island
-    if (clockModeEl && clockModeEl.contains(e.target)) {
-      return;
-    }
-    
-    const currentTime = new Date().getTime();
-    const timeDiff = currentTime - lastClickTime;
-    const sameTarget = lastClickTarget === e.target;
-    
-    if (timeDiff < 300 && timeDiff > 0 && sameTarget) { // Double click on same element
-      debugLog("Double-click detected, switching mode");
-      e.stopPropagation();
-      applyMode(currentMode === 1 ? 2 : 1);
-    }
-    
-    lastClickTime = currentTime;
-    lastClickTarget = e.target;
-  });
+  // Setup nook click handler after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupNookClickHandler, { once: true });
+  } else {
+    setupNookClickHandler();
+  }
 
   // -------- CLOCK (Mode 1) --------
   function updateClock() {
@@ -285,7 +336,8 @@
   function updateVideoInfoImmediate(videoInfo) {
     const incomingVideo = videoInfo && videoInfo.title && videoInfo.title !== "No video playing";
     debugLog('Received video info:', JSON.stringify(videoInfo, null, 2));
-    
+    debugLog('Current mode:', currentMode);
+
     const songTitleEl = document.getElementById("song-title");
     const albumLabelEl = document.getElementById("album-label");
     const artistNameEl = document.getElementById("artist-name");
@@ -304,14 +356,32 @@
         }
       }
       lastGoodThumbnailUrl = null;
+      // Reset to paused state when no video
+      logicalPlaybackState = 'paused';
+      updatePlaybackState('paused');
       return;
     }
 
     // Store new video info (playback state comes from main process SMTC updates)
     currentVideoInfo = videoInfo;
     lastVideoDetectedAt = Date.now();
+    debugLog('Stored video info in currentVideoInfo:', currentVideoInfo.title);
 
-    if (shouldShowVideoInfo()) {
+    // When YouTube video is detected, assume it's playing (YouTube auto-plays)
+    // This shows the PAUSE button which is correct for auto-playing videos
+    // Do this regardless of current mode
+    if (videoInfo.source === "youtube") {
+      logicalPlaybackState = 'playing';
+      updatePlaybackState('playing');
+      debugLog('Set playback state to playing for YouTube video (mode:', currentMode, ')');
+    }
+
+    // Show video info if we're in Mode 2 OR if video is recently detected
+    // In Mode 2, always show cached info (no grace period check)
+    // In Mode 1, only show if recently detected (within grace period)
+    const shouldShow = currentMode === 2 ? true : shouldShowVideoInfo();
+
+    if (currentVideoInfo && shouldShow) {
       const displayInfo = currentVideoInfo;
       if (!displayInfo) {
         // Nothing stored yet, fall back to default art
@@ -321,7 +391,7 @@
         }
         return;
       }
-      debugLog('Showing video info:', displayInfo.title);
+      debugLog('Showing video info:', displayInfo.title, 'in mode:', currentMode, 'shouldShow:', shouldShow);
       // Show video info when YouTube video is detected
       if (songTitleEl) {
         songTitleEl.textContent = displayInfo.title;
@@ -490,7 +560,7 @@
   let nextBtn = null;
   let controlsInitialized = false;
   let playToggleInFlight = false;
-  let logicalPlaybackState = "paused"; // Our best guess of current playback state
+  let logicalPlaybackState = "playing"; // Default to playing when YouTube is detected
 
   function updatePlaybackState(state) {
     if (!playBtn) return;
@@ -508,10 +578,11 @@
   }
 
   function setupMusicControls() {
-    if (controlsInitialized) {
-      debugLog("Music controls already initialized");
-      return;
-    }
+    // Remove the initialized check to allow re-initialization for debugging
+    // if (controlsInitialized) {
+    //   debugLog("Music controls already initialized");
+    //   return;
+    // }
 
     playBtn = document.getElementById("play-btn");
     prevBtn = document.getElementById("prev-btn");
@@ -532,22 +603,27 @@
     }
 
     if (playBtn) {
-      // Default to paused state visually (show Play icon).
-      // This keeps the button semantics intuitive when a YouTube video is initially paused.
-      logicalPlaybackState = 'paused';
+      // Default to playing state (show Pause icon) - assume video might be playing
+      logicalPlaybackState = 'playing';
       updatePlaybackState(logicalPlaybackState);
+
+      // Remove any existing event listeners by cloning
+      const newPlayBtn = playBtn.cloneNode(true);
+      playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+      playBtn = newPlayBtn;
 
       playBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Play button clicked - ACTUAL CLICK DETECTED");
         debugLog("Play button clicked");
         
         if (playToggleInFlight) {
+          console.log("[Music Controls] Play toggle already in flight, ignoring");
           debugLog("Play toggle already in flight, ignoring");
           return;
         }
         playToggleInFlight = true;
-        playBtn.classList.add("is-busy");
 
         // Optimistically flip UI so the user sees immediate feedback
         const nextState = logicalPlaybackState === 'playing' ? 'paused' : 'playing';
@@ -555,6 +631,7 @@
 
         // Send play/pause command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPlayPause) {
+          console.log("[Music Controls] Calling videoPlayPause API");
           debugLog("Calling videoPlayPause API");
           window.SmootieAPI.videoPlayPause();
           // Force a quick state refresh so the button reflects the real YouTube state
@@ -562,78 +639,129 @@
             setTimeout(() => window.SmootieAPI.requestVideoCheck(), 300);
           }
         } else {
-          console.error("SmootieAPI.videoPlayPause not available");
+          console.error("[Music Controls] SmootieAPI.videoPlayPause not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
 
         setTimeout(() => {
           playToggleInFlight = false;
-          playBtn.classList.remove("is-busy");
         }, 450);
       });
+      
+      console.log("[Music Controls] Play button event listener attached successfully");
+    } else {
+      console.error("[Music Controls] Play button not found in DOM");
     }
 
     if (prevBtn) {
+      // Remove any existing event listeners by cloning
+      const newPrevBtn = prevBtn.cloneNode(true);
+      prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+      prevBtn = newPrevBtn;
+
       prevBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Previous button clicked - ACTUAL CLICK DETECTED");
         debugLog("Previous button clicked");
-        
-        // Visual feedback
-        prevBtn.style.opacity = '0.5';
-        setTimeout(() => {
-          prevBtn.style.opacity = '';
-        }, 200);
         
         // Send previous command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoPrevious) {
+          console.log("[Music Controls] Calling videoPrevious API");
           debugLog("Calling videoPrevious API");
           window.SmootieAPI.videoPrevious();
         } else {
-          console.error("SmootieAPI.videoPrevious not available");
+          console.error("[Music Controls] SmootieAPI.videoPrevious not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+      
+      console.log("[Music Controls] Previous button event listener attached successfully");
+    } else {
+      console.error("[Music Controls] Previous button not found in DOM");
     }
 
     if (nextBtn) {
+      // Remove any existing event listeners by cloning
+      const newNextBtn = nextBtn.cloneNode(true);
+      nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+      nextBtn = newNextBtn;
+
       nextBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        console.log("[Music Controls] Next button clicked - ACTUAL CLICK DETECTED");
         debugLog("Next button clicked");
-        
-        // Visual feedback
-        nextBtn.style.opacity = '0.5';
-        setTimeout(() => {
-          nextBtn.style.opacity = '';
-        }, 200);
         
         // Send next command to YouTube
         if (window.SmootieAPI && window.SmootieAPI.videoNext) {
+          console.log("[Music Controls] Calling videoNext API");
           debugLog("Calling videoNext API");
           window.SmootieAPI.videoNext();
         } else {
-          console.error("SmootieAPI.videoNext not available");
+          console.error("[Music Controls] SmootieAPI.videoNext not available");
+          console.error("SmootieAPI object:", window.SmootieAPI);
         }
       });
+      
+      console.log("[Music Controls] Next button event listener attached successfully");
+    } else {
+      console.error("[Music Controls] Next button not found in DOM");
     }
 
     controlsInitialized = true;
   }
 
   // Ensure control listeners are attached after DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupMusicControls, { once: true });
-  } else {
+  // Use a more robust approach with multiple retries
+  function initializeControlsWithRetry() {
+    console.log("[Music Controls] Initializing controls with retry");
     setupMusicControls();
+    
+    // Retry a few times to ensure buttons are found
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryInterval = setInterval(() => {
+      retryCount++;
+      if (retryCount >= maxRetries) {
+        clearInterval(retryInterval);
+        console.log("[Music Controls] Max retries reached");
+        return;
+      }
+      
+      const playCheck = document.getElementById("play-btn");
+      const prevCheck = document.getElementById("prev-btn");
+      const nextCheck = document.getElementById("next-btn");
+      
+      if (playCheck || prevCheck || nextCheck) {
+        console.log("[Music Controls] Found buttons on retry", retryCount);
+        setupMusicControls();
+        clearInterval(retryInterval);
+      }
+    }, 100);
   }
 
-  // Top bar buttons
-  const menuBtn = document.getElementById("menu-btn");
-  const menuMenu = document.getElementById("menu-menu");
-  const menuStartupToggle = document.getElementById("menu-startup-toggle");
-  const homeTabBtn = document.getElementById("tab-tray");
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeControlsWithRetry, { once: true });
+  } else {
+    initializeControlsWithRetry();
+  }
+
+  // Top bar buttons (will be initialized after DOM is ready)
+  let menuBtn = null;
+  let menuMenu = null;
+  let menuStartupToggle = null;
+  let homeTabBtn = null;
   
   function setupTopBarButtons() {
     console.log("[Renderer] setupTopBarButtons called");
+    
+    // Initialize button references
+    menuBtn = document.getElementById("menu-btn");
+    menuMenu = document.getElementById("menu-menu");
+    menuStartupToggle = document.getElementById("menu-startup-toggle");
+    homeTabBtn = document.getElementById("tab-tray");
+    
     const screenshotBtn = document.getElementById("screenshot-btn");
     const recordBtn = document.getElementById("record-btn");
     const recordingIndicator = document.getElementById("recording-indicator");
@@ -866,9 +994,13 @@
   
   // Setup top bar buttons after DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupTopBarButtons, { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      setupTopBarButtons();
+      setupHomeAndStartup();
+    }, { once: true });
   } else {
     setupTopBarButtons();
+    setupHomeAndStartup();
   }
 
   if (menuMenu) {
@@ -895,32 +1027,41 @@
     }
   }
 
-  if (menuStartupToggle) {
-    initializeStartupToggle();
-    menuStartupToggle.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      if (!window.SmootieAPI?.setStartupEnabled) return;
-      const currentState = menuStartupToggle.getAttribute("aria-pressed") === "true";
-      const nextState = !currentState;
-      updateStartupToggleUI(nextState);
-      if (menuMenu) menuMenu.style.display = "none";
-      try {
-        const result = await window.SmootieAPI.setStartupEnabled(nextState);
-        if (typeof result === "boolean") {
-          updateStartupToggleUI(result);
+  // Setup home tab and startup toggle after DOM is ready
+  function setupHomeAndStartup() {
+    homeTabBtn = document.getElementById("tab-tray");
+    menuStartupToggle = document.getElementById("menu-startup-toggle");
+    
+    // Home tab switches to Mode 1
+    if (homeTabBtn) {
+      homeTabBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        debugLog("Home tab clicked, returning to Mode 1");
+        applyMode(1); // Always switch to Mode 1 (clock)
+      });
+    }
+    
+    // Initialize startup toggle
+    if (menuStartupToggle) {
+      initializeStartupToggle();
+      menuStartupToggle.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!window.SmootieAPI?.setStartupEnabled) return;
+        const currentState = menuStartupToggle.getAttribute("aria-pressed") === "true";
+        const nextState = !currentState;
+        updateStartupToggleUI(nextState);
+        if (menuMenu) menuMenu.style.display = "none";
+        try {
+          const result = await window.SmootieAPI.setStartupEnabled(nextState);
+          if (typeof result === "boolean") {
+            updateStartupToggleUI(result);
+          }
+        } catch (error) {
+          console.error("Failed to toggle startup:", error);
+          updateStartupToggleUI(currentState);
         }
-      } catch (error) {
-        console.error("Failed to toggle startup:", error);
-        updateStartupToggleUI(currentState);
-      }
-    });
-  }
-
-  if (homeTabBtn) {
-    homeTabBtn.addEventListener("click", () => {
-      debugLog("Home tab clicked, returning to Mode 1");
-      applyMode(1); // Always switch to Mode 1 (clock)
-    });
+      });
+    }
   }
 
   // Close settings menu when clicking outside
@@ -930,17 +1071,7 @@
     }
   });
 
-  // Click on nook-tray background to return to mode 1 (clock)
-  const nookTray = document.getElementById("mode-nook");
-  if (nookTray) {
-    nookTray.addEventListener("click", (e) => {
-      // Only switch to mode 1 if clicking on the background, not interactive elements
-      if (e.target === nookTray || e.target.classList.contains("nook-content")) {
-        debugLog("Background clicked, returning to Mode 1");
-        applyMode(1); // Switch to clock mode
-      }
-    });
-  }
+
 
   // Listen for video info updates from main process
   if (window.SmootieAPI) {
@@ -953,6 +1084,19 @@
   if (window.SmootieAPI) {
     window.SmootieAPI.onPlaybackStateUpdate((state) => {
       updatePlaybackState(state);
+    });
+  }
+
+  // Listen for island show/hide events from main process
+  if (window.SmootieAPI) {
+    window.SmootieAPI.onIslandShow(() => {
+      debugLog("Received island-show event from main process");
+      // Island is being shown - preserve current mode
+    });
+
+    window.SmootieAPI.onIslandHide(() => {
+      debugLog("Received island-hide event from main process");
+      // Island is being hidden - preserve current mode for when it shows again
     });
   }
 
@@ -999,13 +1143,15 @@
           profileImg.style.display = "block";
           debugLog("Image src set to:", profileImg.src);
         } else {
-          // No photo found - hide image to show dark background
-          profileImg.style.display = "none";
-          debugLog("No photo found, hiding image");
+          // No photo found - show placeholder
+          profileImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E";
+          profileImg.style.display = "block";
+          debugLog("No photo found, showing placeholder");
         }
       }).catch((error) => {
-        // Error - hide image to show dark background
-        profileImg.style.display = "none";
+        // Error - show placeholder
+        profileImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'%3E%3Crect width='90' height='90' fill='%23222'/%3E%3Ccircle cx='45' cy='35' r='18' fill='%23444'/%3E%3Cpath d='M15 90 Q45 60 75 90' fill='%23444'/%3E%3C/svg%3E";
+        profileImg.style.display = "block";
         debugLog("Could not load random photo:", error);
       });
     } else {
@@ -1056,6 +1202,8 @@
   loadRandomPhoto();
 
   // -------- WINDOW MAXIMIZATION DETECTION --------
+  // DISABLED: Island now always stays visible regardless of maximization state
+  /*
   let isWindowMaximized = false;
 
   // Update island visibility based on maximization state with debouncing
@@ -1069,16 +1217,17 @@
 
     // Debounce visibility changes to prevent flickering
     visibilityTimeout = setTimeout(() => {
-      const windowContainer = document.querySelector(".window-container");
+      const nookTray = document.getElementById("mode-nook");
+      const clockMode = document.getElementById("mode-clock");
 
-      if (windowContainer) {
+      if (nookTray && clockMode) {
         if (isWindowMaximized) {
-          windowContainer.style.visibility = "hidden";
-          windowContainer.style.opacity = "0";
+          nookTray.classList.add("mode-hidden");
+          clockMode.classList.add("mode-hidden");
           debugLog("Island hidden: window maximized");
         } else {
-          windowContainer.style.visibility = "visible";
-          windowContainer.style.opacity = "1";
+          nookTray.classList.remove("mode-hidden");
+          clockMode.classList.remove("mode-hidden");
           debugLog("Island shown: window not maximized");
         }
       }
@@ -1087,6 +1236,7 @@
   }
 
   if (window.SmootieAPI) {
+    // Island show/hide events
     if (window.SmootieAPI.onIslandHide) {
       window.SmootieAPI.onIslandHide(() => {
         debugLog("Received island hide event");
@@ -1117,4 +1267,5 @@
       });
     }
   }
+  */
 })();
